@@ -4,7 +4,7 @@ export interface NewsItem {
   content: string;
   source: string;
   url: string;
-  publishedAt: Date;
+  publishedAt: string;
 }
 
 export interface AnalysisResult {
@@ -13,6 +13,7 @@ export interface AnalysisResult {
   credibility: number; // 0 to 1
   summary: string;
   tags: string[];
+  finalScore: number; // 0 to 100
 }
 
 export interface ScoreResult extends AnalysisResult {
