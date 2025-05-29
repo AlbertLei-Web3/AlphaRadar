@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:crawler": "ts-node src/test/crawler.test.ts",
+    "test:cleaner": "ts-node src/test/cleaner.test.ts",
+    "test:sentiment": "ts-node src/test/sentiment.test.ts",
+    "test:notifier": "ts-node src/test/notifier.test.ts",
+    "test:pipeline": "ts-node src/test/full-pipeline.test.ts"
   },
   "dependencies": {
     "next": "^14.1.0",
@@ -14,10 +19,13 @@
     "react-dom": "^18.2.0",
     "openai": "^4.28.0",
     "rss-parser": "^3.13.0",
-    "axios": "^1.6.7",
+    "axios": "^1.6.7"
+  },
+  "devDependencies": {
     "typescript": "^5.3.3",
     "@types/node": "^20.11.19",
     "@types/react": "^18.2.57",
-    "@types/react-dom": "^18.2.19"
+    "@types/react-dom": "^18.2.19",
+    "ts-node": "^10.9.2"
   }
 } 
