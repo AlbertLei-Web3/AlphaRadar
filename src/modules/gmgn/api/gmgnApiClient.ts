@@ -1,6 +1,6 @@
 import fetch, { RequestInit } from 'node-fetch';
 import { GMGNConfig } from '../types';
-import HttpsProxyAgent from 'https-proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 export class GMGNApiClient {
   private config: GMGNConfig;
@@ -107,12 +107,12 @@ export class GMGNApiClient {
     // Add proxy if configured
     // 如果配置了代理，则添加代理
     if (this.config.proxy) {
-      const proxyAgent = new HttpsProxyAgent(this.config.proxy);
-      defaultOptions.agent = proxyAgent;
+      defaultOptions.agent = new HttpsProxyAgent(this.config.proxy) as any;
     }
 
     try {
       console.log(`Making request to: ${url}`);
+      console.log(`Using proxy: ${this.config.proxy || 'No proxy'}`);
       const response = await fetch(url, { ...defaultOptions, ...options });
 
       if (!response.ok) {
