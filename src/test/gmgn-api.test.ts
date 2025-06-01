@@ -2,11 +2,10 @@ import { GMGNApiClient } from '../modules/gmgn';
 import { gmgnConfig } from '../config/gmgn-config';
 
 async function testGMGNApi() {
-  // Configure proxy for VPN
-  // 配置VPN代理
+  // Use direct config, no proxy
+  // 直接使用配置，不使用代理
   const config = {
-    ...gmgnConfig,
-    proxy: 'http://127.0.0.1:48004' // Your VPN proxy port
+    ...gmgnConfig
   };
   
   const apiClient = new GMGNApiClient(config);
@@ -19,8 +18,6 @@ async function testGMGNApi() {
   try {
     console.log('Testing GMGN API Integration...');
     console.log('测试GMGN API集成...');
-    console.log('Using proxy:', config.proxy);
-    console.log('使用代理:', config.proxy);
 
     // Test getTokenInfo
     // 测试getTokenInfo

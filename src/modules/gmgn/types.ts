@@ -1,7 +1,6 @@
 export interface GMGNConfig {
   apiHost: string;
   apiKey?: string;
-  proxy?: string; // HTTP/HTTPS proxy URL (e.g., 'http://proxy.example.com:8080')
 }
 
 export interface TokenInfo {
