@@ -1,115 +1,122 @@
-import { GMGNConfig, TokenInfo, FilterConditions, EarlyDetectionResult, GMGNResponse } from './types';
-import fetch from 'node-fetch';
+import { EventEmitter } from 'events';
+import { GMGNConfig, TokenInfo, TokenPrice } from './types';
+import { GMGNApiClient } from './api/gmgnApiClient';
 
-export class GMGNService {
+export class GMGNService extends EventEmitter {
+  private apiClient: GMGNApiClient;
   private config: GMGNConfig;
-  private defaultFilters: FilterConditions = {
-    minLiquidity: 10, // 10 SOL
-    minHolderCount: 100,
-    minVolume24h: 5, // 5 SOL
-    maxPriceImpact: 5, // 5%
-    maxMarketCap: 1000000 // 1M SOL
-  };
-
-  private readonly MAX_RETRIES = 3;
-  private readonly RETRY_DELAY = 1000; // 1 second
 
   constructor(config: GMGNConfig) {
+    super();
     this.config = config;
+    this.apiClient = new GMGNApiClient(config);
   }
 
+  // Get token information
+  // 获取代币信息
   async getTokenInfo(tokenAddress: string): Promise<TokenInfo> {
-    const response = await this.makeRequest(`/defi/router/v1/sol/token/info?address=${tokenAddress}`);
-    return this.parseTokenInfo(response.data);
+    return this.apiClient.getTokenInfo(tokenAddress);
   }
 
-  async checkEarlyDetection(tokenAddress: string, filters?: Partial<FilterConditions>): Promise<EarlyDetectionResult> {
-    const tokenInfo = await this.getTokenInfo(tokenAddress);
-    const activeFilters = { ...this.defaultFilters, ...filters };
-    
-    const signals = {
-      liquiditySignal: tokenInfo.liquidity >= activeFilters.minLiquidity,
-      holderSignal: tokenInfo.holderCount >= activeFilters.minHolderCount,
-      volumeSignal: tokenInfo.volume24h >= activeFilters.minVolume24h,
-      priceImpactSignal: this.calculatePriceImpact(tokenInfo) <= activeFilters.maxPriceImpact
-    };
-
-    const score = this.calculateScore(signals, tokenInfo);
-    const riskLevel = this.determineRiskLevel(score);
-
-    return {
-      token: tokenInfo,
-      score,
-      riskLevel,
-      signals,
-      timestamp: Date.now()
-    };
+  // Get token price
+  // 获取代币价格
+  async getTokenPrice(tokenAddress: string): Promise<TokenPrice> {
+    return this.apiClient.getTokenPrice(tokenAddress);
   }
 
-  private async makeRequest(endpoint: string, retryCount = 0): Promise<GMGNResponse> {
-    try {
-      const url = `${this.config.apiHost}${endpoint}`;
-      const response = await fetch(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
-        },
-        timeout: 5000 // 5 second timeout
-      });
+  // Get token holders
+  // 获取代币持有者
+  async getTokenHolders(tokenAddress: string, page: number = 1, limit: number = 100) {
+    return this.apiClient.getTokenHolders(tokenAddress, page, limit);
+  }
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+  // Get token transactions
+  // 获取代币交易
+  async getTokenTransactions(tokenAddress: string, page: number = 1, limit: number = 100) {
+    return this.apiClient.getTokenTransactions(tokenAddress, page, limit);
+  }
+
+  // Get swap route
+  // 获取交换路由
+  async getSwapRoute(params: {
+    tokenInAddress: string;
+    tokenOutAddress: string;
+    inAmount: string;
+    fromAddress: string;
+    slippage: number;
+    swapMode?: 'ExactIn' | 'ExactOut';
+    fee?: number;
+    isAntiMev?: boolean;
+  }) {
+    return this.apiClient.getSwapRoute(params);
+  }
+
+  // Submit transaction
+  // 提交交易
+  async submitTransaction(params: {
+    chain: 'sol';
+    signedTx: string;
+    isAntiMev?: boolean;
+  }) {
+    return this.apiClient.submitTransaction(params);
+  }
+
+  // Get transaction status
+  // 获取交易状态
+  async getTransactionStatus(params: {
+    hash: string;
+    lastValidHeight: number;
+  }) {
+    return this.apiClient.getTransactionStatus(params);
+  }
+
+  // Monitor token for changes
+  // 监控代币变化
+  async monitorToken(tokenAddress: string, interval: number = 60000): Promise<void> {
+    let lastPrice: string | null = null;
+    let lastHolderCount: number | null = null;
+
+    const checkChanges = async () => {
+      try {
+        const [tokenInfo, price] = await Promise.all([
+          this.getTokenInfo(tokenAddress),
+          this.getTokenPrice(tokenAddress)
+        ]);
+
+        if (lastPrice !== price.price) {
+          this.emit('priceChange', {
+            tokenAddress,
+            oldPrice: lastPrice,
+            newPrice: price.price,
+            timestamp: new Date().toISOString()
+          });
+          lastPrice = price.price;
+        }
+
+        if (lastHolderCount !== tokenInfo.holderCount) {
+          this.emit('holderCountChange', {
+            tokenAddress,
+            oldCount: lastHolderCount,
+            newCount: tokenInfo.holderCount,
+            timestamp: new Date().toISOString()
+          });
+          lastHolderCount = tokenInfo.holderCount;
+        }
+      } catch (error) {
+        this.emit('error', {
+          tokenAddress,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        });
       }
-
-      return await response.json();
-    } catch (error: unknown) {
-      if (retryCount < this.MAX_RETRIES) {
-        console.log(`Retry attempt ${retryCount + 1} for endpoint: ${endpoint}`);
-        await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * (retryCount + 1)));
-        return this.makeRequest(endpoint, retryCount + 1);
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to fetch data after ${this.MAX_RETRIES} retries: ${errorMessage}`);
-    }
-  }
-
-  private parseTokenInfo(data: any): TokenInfo {
-    if (!data) {
-      throw new Error('Invalid token data received');
-    }
-
-    return {
-      address: data.address || '',
-      symbol: data.symbol || 'UNKNOWN',
-      name: data.name || 'Unknown Token',
-      decimals: data.decimals || 0,
-      totalSupply: data.totalSupply || '0',
-      holderCount: data.holderCount || 0,
-      liquidity: data.liquidity || 0,
-      price: data.price || 0,
-      volume24h: data.volume24h || 0
     };
-  }
 
-  private calculatePriceImpact(tokenInfo: TokenInfo): number {
-    if (!tokenInfo.liquidity || tokenInfo.liquidity === 0) {
-      return 100; // Maximum price impact if no liquidity
-    }
-    return (tokenInfo.volume24h / tokenInfo.liquidity) * 100;
-  }
+    // Initial check
+    // 初始检查
+    await checkChanges();
 
-  private calculateScore(signals: any, tokenInfo: TokenInfo): number {
-    let score = 0;
-    if (signals.liquiditySignal) score += 25;
-    if (signals.holderSignal) score += 25;
-    if (signals.volumeSignal) score += 25;
-    if (signals.priceImpactSignal) score += 25;
-    return score;
-  }
-
-  private determineRiskLevel(score: number): 'LOW' | 'MEDIUM' | 'HIGH' {
-    if (score >= 75) return 'LOW';
-    if (score >= 50) return 'MEDIUM';
-    return 'HIGH';
+    // Set up interval
+    // 设置间隔
+    setInterval(checkChanges, interval);
   }
 } 

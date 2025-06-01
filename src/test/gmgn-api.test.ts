@@ -56,6 +56,7 @@ async function testGMGNApi() {
 
   } catch (error) {
     console.error('API Test Failed:', error);
+    process.exit(1);
   }
 }
 

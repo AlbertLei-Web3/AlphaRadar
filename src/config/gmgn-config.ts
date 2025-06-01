@@ -1,9 +1,10 @@
 import { GMGNConfig, FilterConditions } from '../modules/gmgn/types';
 
+// GMGN API configuration
+// GMGN API配置
 export const gmgnConfig: GMGNConfig = {
-  apiHost: 'https://gmgn.ai',
-  // Add your API key here if required
-  // apiKey: process.env.GMGN_API_KEY
+  apiHost: 'https://api.gmgn.ai',
+  apiKey: process.env.GMGN_API_KEY || ''
 };
 
 export const defaultFilterConditions: FilterConditions = {
