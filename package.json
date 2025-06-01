@@ -13,6 +13,7 @@
     "test:sentiment": "ts-node src/test/sentiment.test.ts",
     "test:notifier": "ts-node src/test/notifier.test.ts",
     "test:pipeline": "ts-node src/test/full-pipeline.test.ts",
+    "test:gmgn": "ts-node src/test/gmgn-api.test.ts",
     "meme-radar:example": "ts-node examples/meme-radar-example.ts",
     "meme-radar:dev": "ts-node -e \"import('./src/pipeline/meme-radar-pipeline').then(m => { const { MemeRadarPipeline } = m; const { loadConfig } = require('./src/config/meme-radar-config'); const config = loadConfig('development'); const pipeline = new MemeRadarPipeline(config); pipeline.initialize().then(() => pipeline.startMonitoring()); })\"",
     "meme-radar:scan": "ts-node -e \"import('./src/pipeline/meme-radar-pipeline').then(m => { const { MemeRadarPipeline } = m; const { loadConfig } = require('./src/config/meme-radar-config'); const config = loadConfig('development'); const pipeline = new MemeRadarPipeline(config); pipeline.initialize().then(() => pipeline.runScan()).then(console.log); })\"",
