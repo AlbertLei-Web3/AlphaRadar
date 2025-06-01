@@ -4,6 +4,8 @@ import { GMGNConfig } from '../types';
 export class GMGNApiClient {
   private config: GMGNConfig;
   private readonly BASE_URL: string;
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAY = 1000; // 1 second
 
   constructor(config: GMGNConfig) {
     this.config = config;
@@ -90,7 +92,7 @@ export class GMGNApiClient {
     return this.makeRequest(endpoint);
   }
 
-  private async makeRequest(endpoint: string, options: Partial<RequestInit> = {}) {
+  private async makeRequest(endpoint: string, options: Partial<RequestInit> = {}, retryCount = 0): Promise<any> {
     const url = `${this.BASE_URL}${endpoint}`;
     const defaultOptions: Partial<RequestInit> = {
       headers: {
@@ -101,13 +103,18 @@ export class GMGNApiClient {
 
     try {
       const response = await fetch(url, { ...defaultOptions, ...options });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       return await response.json();
     } catch (error: unknown) {
+      if (retryCount < this.MAX_RETRIES) {
+        console.log(`Retry attempt ${retryCount + 1} for endpoint: ${endpoint}`);
+        await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * (retryCount + 1)));
+        return this.makeRequest(endpoint, options, retryCount + 1);
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`GMGN API request failed: ${errorMessage}`);
     }

@@ -1,10 +1,17 @@
 import { EventEmitter } from 'events';
-import { GMGNConfig, TokenInfo, TokenPrice } from './types';
+import { GMGNConfig, TokenInfo, TokenPrice, FilterConditions, EarlyDetectionResult } from './types';
 import { GMGNApiClient } from './api/gmgnApiClient';
 
 export class GMGNService extends EventEmitter {
   private apiClient: GMGNApiClient;
   private config: GMGNConfig;
+  private defaultFilters: FilterConditions = {
+    minLiquidity: 10, // 10 SOL
+    minHolderCount: 100,
+    minVolume24h: 5, // 5 SOL
+    maxPriceImpact: 5, // 5%
+    maxMarketCap: 1000000 // 1M SOL
+  };
 
   constructor(config: GMGNConfig) {
     super();
@@ -68,6 +75,56 @@ export class GMGNService extends EventEmitter {
     lastValidHeight: number;
   }) {
     return this.apiClient.getTransactionStatus(params);
+  }
+
+  // Check for early detection signals
+  // 检查早期检测信号
+  async checkEarlyDetection(tokenAddress: string, filters?: Partial<FilterConditions>): Promise<EarlyDetectionResult> {
+    const [tokenInfo, price] = await Promise.all([
+      this.getTokenInfo(tokenAddress),
+      this.getTokenPrice(tokenAddress)
+    ]);
+
+    const activeFilters = { ...this.defaultFilters, ...filters };
+    const volume24h = parseFloat(price.volume24h);
+    const priceImpact = Math.abs(price.priceChange24h);
+
+    const signals = {
+      liquiditySignal: volume24h >= activeFilters.minLiquidity,
+      holderSignal: tokenInfo.holderCount >= activeFilters.minHolderCount,
+      volumeSignal: volume24h >= activeFilters.minVolume24h,
+      priceImpactSignal: priceImpact <= activeFilters.maxPriceImpact
+    };
+
+    const score = this.calculateScore(signals);
+    const riskLevel = this.determineRiskLevel(score);
+
+    return {
+      token: tokenInfo,
+      score,
+      riskLevel,
+      signals,
+      timestamp: Date.now()
+    };
+  }
+
+  // Calculate score based on signals
+  // 根据信号计算分数
+  private calculateScore(signals: EarlyDetectionResult['signals']): number {
+    let score = 0;
+    if (signals.liquiditySignal) score += 25;
+    if (signals.holderSignal) score += 25;
+    if (signals.volumeSignal) score += 25;
+    if (signals.priceImpactSignal) score += 25;
+    return score;
+  }
+
+  // Determine risk level based on score
+  // 根据分数确定风险等级
+  private determineRiskLevel(score: number): 'LOW' | 'MEDIUM' | 'HIGH' {
+    if (score >= 75) return 'LOW';
+    if (score >= 50) return 'MEDIUM';
+    return 'HIGH';
   }
 
   // Monitor token for changes

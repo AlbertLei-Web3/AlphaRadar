@@ -17,42 +17,62 @@ async function testGMGNApi() {
     // 测试getTokenInfo
     console.log('\nTesting getTokenInfo:');
     console.log('测试getTokenInfo:');
-    const tokenInfo = await apiClient.getTokenInfo(SOL_ADDRESS);
-    console.log('Token Info:', tokenInfo);
+    try {
+      const tokenInfo = await apiClient.getTokenInfo(SOL_ADDRESS);
+      console.log('Token Info:', tokenInfo);
+    } catch (error) {
+      console.error('getTokenInfo failed:', error);
+    }
 
     // Test getTokenPrice
     // 测试getTokenPrice
     console.log('\nTesting getTokenPrice:');
     console.log('测试getTokenPrice:');
-    const price = await apiClient.getTokenPrice(SOL_ADDRESS);
-    console.log('Token Price:', price);
+    try {
+      const price = await apiClient.getTokenPrice(SOL_ADDRESS);
+      console.log('Token Price:', price);
+    } catch (error) {
+      console.error('getTokenPrice failed:', error);
+    }
 
     // Test getTokenHolders
     // 测试getTokenHolders
     console.log('\nTesting getTokenHolders:');
     console.log('测试getTokenHolders:');
-    const holders = await apiClient.getTokenHolders(TEST_TOKEN);
-    console.log('Token Holders:', holders);
+    try {
+      const holders = await apiClient.getTokenHolders(TEST_TOKEN);
+      console.log('Token Holders:', holders);
+    } catch (error) {
+      console.error('getTokenHolders failed:', error);
+    }
 
     // Test getTokenTransactions
     // 测试getTokenTransactions
     console.log('\nTesting getTokenTransactions:');
     console.log('测试getTokenTransactions:');
-    const transactions = await apiClient.getTokenTransactions(TEST_TOKEN);
-    console.log('Token Transactions:', transactions);
+    try {
+      const transactions = await apiClient.getTokenTransactions(TEST_TOKEN);
+      console.log('Token Transactions:', transactions);
+    } catch (error) {
+      console.error('getTokenTransactions failed:', error);
+    }
 
     // Test getSwapRoute
     // 测试getSwapRoute
     console.log('\nTesting getSwapRoute:');
     console.log('测试getSwapRoute:');
-    const swapRoute = await apiClient.getSwapRoute({
-      tokenInAddress: SOL_ADDRESS,
-      tokenOutAddress: TEST_TOKEN,
-      inAmount: '1000000000', // 1 SOL
-      fromAddress: '2kpJ5QRh16aRQ4oLZ5LnucHFDAZtEFz6omqWWMzDSNrx',
-      slippage: 0.5
-    });
-    console.log('Swap Route:', swapRoute);
+    try {
+      const swapRoute = await apiClient.getSwapRoute({
+        tokenInAddress: SOL_ADDRESS,
+        tokenOutAddress: TEST_TOKEN,
+        inAmount: '1000000000', // 1 SOL
+        fromAddress: '2kpJ5QRh16aRQ4oLZ5LnucHFDAZtEFz6omqWWMzDSNrx',
+        slippage: 0.5
+      });
+      console.log('Swap Route:', swapRoute);
+    } catch (error) {
+      console.error('getSwapRoute failed:', error);
+    }
 
   } catch (error) {
     console.error('API Test Failed:', error);
