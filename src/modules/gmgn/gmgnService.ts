@@ -1,4 +1,5 @@
 import { GMGNConfig, TokenInfo, FilterConditions, EarlyDetectionResult, GMGNResponse } from './types';
+import fetch from 'node-fetch';
 
 export class GMGNService {
   private config: GMGNConfig;
@@ -9,6 +10,9 @@ export class GMGNService {
     maxPriceImpact: 5, // 5%
     maxMarketCap: 1000000 // 1M SOL
   };
+
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAY = 1000; // 1 second
 
   constructor(config: GMGNConfig) {
     this.config = config;
@@ -42,35 +46,56 @@ export class GMGNService {
     };
   }
 
-  private async makeRequest(endpoint: string): Promise<GMGNResponse> {
-    const url = `${this.config.apiHost}${endpoint}`;
-    const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
+  private async makeRequest(endpoint: string, retryCount = 0): Promise<GMGNResponse> {
+    try {
+      const url = `${this.config.apiHost}${endpoint}`;
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
+        },
+        timeout: 5000 // 5 second timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    });
-    return response.json();
+
+      return await response.json();
+    } catch (error: unknown) {
+      if (retryCount < this.MAX_RETRIES) {
+        console.log(`Retry attempt ${retryCount + 1} for endpoint: ${endpoint}`);
+        await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * (retryCount + 1)));
+        return this.makeRequest(endpoint, retryCount + 1);
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to fetch data after ${this.MAX_RETRIES} retries: ${errorMessage}`);
+    }
   }
 
   private parseTokenInfo(data: any): TokenInfo {
-    // Implementation will depend on actual GMGN API response structure
+    if (!data) {
+      throw new Error('Invalid token data received');
+    }
+
     return {
-      address: data.address,
-      symbol: data.symbol,
-      name: data.name,
-      decimals: data.decimals,
-      totalSupply: data.totalSupply,
-      holderCount: data.holderCount,
-      liquidity: data.liquidity,
-      price: data.price,
-      volume24h: data.volume24h
+      address: data.address || '',
+      symbol: data.symbol || 'UNKNOWN',
+      name: data.name || 'Unknown Token',
+      decimals: data.decimals || 0,
+      totalSupply: data.totalSupply || '0',
+      holderCount: data.holderCount || 0,
+      liquidity: data.liquidity || 0,
+      price: data.price || 0,
+      volume24h: data.volume24h || 0
     };
   }
 
   private calculatePriceImpact(tokenInfo: TokenInfo): number {
-    // Implement price impact calculation based on liquidity and volume
-    return 0; // Placeholder
+    if (!tokenInfo.liquidity || tokenInfo.liquidity === 0) {
+      return 100; // Maximum price impact if no liquidity
+    }
+    return (tokenInfo.volume24h / tokenInfo.liquidity) * 100;
   }
 
   private calculateScore(signals: any, tokenInfo: TokenInfo): number {
