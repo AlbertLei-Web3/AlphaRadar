@@ -1,11 +1,13 @@
 import fetch, { RequestInit } from 'node-fetch';
 import { GMGNConfig } from '../types';
+import HttpsProxyAgent from 'https-proxy-agent';
 
 export class GMGNApiClient {
   private config: GMGNConfig;
   private readonly BASE_URL: string;
   private readonly MAX_RETRIES = 3;
   private readonly RETRY_DELAY = 1000; // 1 second
+  private readonly TIMEOUT = 10000; // 10 seconds
 
   constructor(config: GMGNConfig) {
     this.config = config;
@@ -98,25 +100,39 @@ export class GMGNApiClient {
       headers: {
         'Content-Type': 'application/json',
         ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
-      }
+      },
+      timeout: this.TIMEOUT
     };
 
+    // Add proxy if configured
+    // 如果配置了代理，则添加代理
+    if (this.config.proxy) {
+      const proxyAgent = new HttpsProxyAgent(this.config.proxy);
+      defaultOptions.agent = proxyAgent;
+    }
+
     try {
+      console.log(`Making request to: ${url}`);
       const response = await fetch(url, { ...defaultOptions, ...options });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       return await response.json();
     } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`Request failed (attempt ${retryCount + 1}/${this.MAX_RETRIES}): ${errorMessage}`);
+
       if (retryCount < this.MAX_RETRIES) {
-        console.log(`Retry attempt ${retryCount + 1} for endpoint: ${endpoint}`);
-        await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY * (retryCount + 1)));
+        const delay = this.RETRY_DELAY * Math.pow(2, retryCount); // Exponential backoff
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         return this.makeRequest(endpoint, options, retryCount + 1);
       }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`GMGN API request failed: ${errorMessage}`);
+
+      throw new Error(`GMGN API request failed after ${this.MAX_RETRIES} attempts: ${errorMessage}`);
     }
   }
 } 

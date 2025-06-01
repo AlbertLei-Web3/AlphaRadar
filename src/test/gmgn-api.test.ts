@@ -2,7 +2,14 @@ import { GMGNApiClient } from '../modules/gmgn';
 import { gmgnConfig } from '../config/gmgn-config';
 
 async function testGMGNApi() {
-  const apiClient = new GMGNApiClient(gmgnConfig);
+  // Add proxy configuration if needed
+  // 如果需要，添加代理配置
+  const config = {
+    ...gmgnConfig,
+    proxy: process.env.HTTP_PROXY || process.env.HTTPS_PROXY
+  };
+  
+  const apiClient = new GMGNApiClient(config);
   
   // Test token addresses
   // 测试代币地址
@@ -12,6 +19,8 @@ async function testGMGNApi() {
   try {
     console.log('Testing GMGN API Integration...');
     console.log('测试GMGN API集成...');
+    console.log('Using proxy:', config.proxy || 'No proxy configured');
+    console.log('使用代理:', config.proxy || '未配置代理');
 
     // Test getTokenInfo
     // 测试getTokenInfo
