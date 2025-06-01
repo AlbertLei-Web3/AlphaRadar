@@ -1,4 +1,4 @@
-import { GMGNApiClient } from '../modules/gmgn/api/gmgnApiClient';
+import { GMGNApiClient } from '../modules/gmgn';
 import { gmgnConfig } from '../config/gmgn-config';
 
 async function testGMGNApi() {
