@@ -124,14 +124,9 @@ export class GMGNApiClient {
     // Add proxy configuration if available
     // 如果配置了代理，添加代理设置
     if (this.config.proxy) {
-      defaultOptions.agent = new HttpsProxyAgent({
-        host: this.config.proxy.host,
-        port: this.config.proxy.port.toString(),
-        protocol: this.config.proxy.protocol,
-        ...(this.config.proxy.auth && {
-          auth: `${this.config.proxy.auth.username}:${this.config.proxy.auth.password}`
-        })
-      });
+      // 构建代理URL字符串
+      const proxyUrl = `${this.config.proxy.protocol}://${this.config.proxy.host}:${this.config.proxy.port}`;
+      defaultOptions.agent = new HttpsProxyAgent(proxyUrl);
     }
 
     try {
