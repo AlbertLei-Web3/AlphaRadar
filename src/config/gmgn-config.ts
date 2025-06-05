@@ -1,3 +1,4 @@
+import 'dotenv/config'; // 确保环境变量优先加载
 import { GMGNConfig, FilterConditions } from '../modules/gmgn/types';
 
 // GMGN API configuration

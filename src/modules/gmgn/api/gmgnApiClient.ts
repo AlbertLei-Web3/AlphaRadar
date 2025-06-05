@@ -135,36 +135,34 @@ export class GMGNApiClient {
     }
 
     try {
-      console.log(`Making request to: ${url}`);
-      console.log('Request options:', JSON.stringify(defaultOptions, null, 2));
-      
+      // 发送API请求，处理响应
+      // Send API request and handle response
       const response = await fetch(url, { ...defaultOptions, ...options });
 
       if (!response.ok) {
         const errorText = await response.text();
+        // 仅保留必要的错误日志
+        // Only keep essential error logging
         console.error('Response not OK:', {
           status: response.status,
           statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
           body: errorText
         });
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      const data = await response.json();
-      console.log('Response received:', JSON.stringify(data, null, 2));
-      return data;
+      // 返回JSON数据
+      // Return JSON data
+      return await response.json();
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Request failed (attempt ${retryCount + 1}/${this.MAX_RETRIES}):`, {
-        error: errorMessage,
-        url,
-        options: defaultOptions
-      });
+      // 仅保留必要的错误日志
+      // Only keep essential error logging
+      console.error(`Request failed (attempt ${retryCount + 1}/${this.MAX_RETRIES}):`, errorMessage);
 
       if (retryCount < this.MAX_RETRIES) {
-        const delay = this.RETRY_DELAY * Math.pow(2, retryCount); // Exponential backoff
-        console.log(`Retrying in ${delay}ms...`);
+        const delay = this.RETRY_DELAY * Math.pow(2, retryCount); // 指数退避
+        // Exponential backoff for retry
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.makeRequest(endpoint, options, retryCount + 1);
       }

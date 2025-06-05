@@ -21,11 +21,13 @@ export class SourceManager {
 
   /**
    * Unregister a data source
+   * 注销数据源
    */
   unregisterSource(sourceName: string): void {
     this.sources.delete(sourceName);
     this.configs.delete(sourceName);
-    console.log(`🗑️ Data source '${sourceName}' unregistered`);
+    // 移除数据源时无需输出调试信息
+    // No debug output needed when unregistering source
   }
 
   /**
