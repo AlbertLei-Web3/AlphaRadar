@@ -1,12 +1,27 @@
 import fetch, { RequestInit } from 'node-fetch';
 import { GMGNConfig } from '../types';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 export class GMGNApiClient {
+  // Configuration object containing API settings
+  // 包含API设置的配置对象
   private config: GMGNConfig;
+  
+  // Base URL for API requests
+  // API请求的基础URL
   private readonly BASE_URL: string;
+  
+  // Maximum number of retry attempts
+  // 最大重试次数
   private readonly MAX_RETRIES = 3;
-  private readonly RETRY_DELAY = 1000; // 1 second
-  private readonly TIMEOUT = 10000; // 10 seconds
+  
+  // Delay between retries in milliseconds
+  // 重试之间的延迟（毫秒）
+  private readonly RETRY_DELAY = 1000;
+  
+  // Request timeout in milliseconds
+  // 请求超时时间（毫秒）
+  private readonly TIMEOUT = 30000;
 
   constructor(config: GMGNConfig) {
     this.config = config;
@@ -95,27 +110,57 @@ export class GMGNApiClient {
 
   private async makeRequest(endpoint: string, options: Partial<RequestInit> = {}, retryCount = 0): Promise<any> {
     const url = `${this.BASE_URL}${endpoint}`;
+    
+    // Default request options including headers and timeout
+    // 默认请求选项，包括请求头和超时设置
     const defaultOptions: Partial<RequestInit> = {
       headers: {
         'Content-Type': 'application/json',
         ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` })
       },
-      timeout: this.TIMEOUT
+      timeout: this.TIMEOUT,
     };
+
+    // Add proxy configuration if available
+    // 如果配置了代理，添加代理设置
+    if (this.config.proxy) {
+      defaultOptions.agent = new HttpsProxyAgent({
+        host: this.config.proxy.host,
+        port: this.config.proxy.port.toString(),
+        protocol: this.config.proxy.protocol,
+        ...(this.config.proxy.auth && {
+          auth: `${this.config.proxy.auth.username}:${this.config.proxy.auth.password}`
+        })
+      });
+    }
 
     try {
       console.log(`Making request to: ${url}`);
+      console.log('Request options:', JSON.stringify(defaultOptions, null, 2));
+      
       const response = await fetch(url, { ...defaultOptions, ...options });
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Response not OK:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: errorText
+        });
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log('Response received:', JSON.stringify(data, null, 2));
+      return data;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Request failed (attempt ${retryCount + 1}/${this.MAX_RETRIES}): ${errorMessage}`);
+      console.error(`Request failed (attempt ${retryCount + 1}/${this.MAX_RETRIES}):`, {
+        error: errorMessage,
+        url,
+        options: defaultOptions
+      });
 
       if (retryCount < this.MAX_RETRIES) {
         const delay = this.RETRY_DELAY * Math.pow(2, retryCount); // Exponential backoff

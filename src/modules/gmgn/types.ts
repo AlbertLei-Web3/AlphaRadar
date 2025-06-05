@@ -1,6 +1,39 @@
+// Proxy configuration interface
+// 代理配置接口
+export interface ProxyConfig {
+  // Proxy server host address
+  // 代理服务器主机地址
+  host: string;
+  // Proxy server port number
+  // 代理服务器端口号
+  port: number;
+  // Proxy protocol (http or https)
+  // 代理协议（http或https）
+  protocol: 'http' | 'https';
+  // Optional authentication credentials
+  // 可选的认证凭据
+  auth?: {
+    // Proxy username
+    // 代理用户名
+    username: string;
+    // Proxy password
+    // 代理密码
+    password: string;
+  };
+}
+
+// GMGN API configuration interface
+// GMGN API配置接口
 export interface GMGNConfig {
+  // API host URL
+  // API主机URL
   apiHost: string;
+  // Optional API key for authentication
+  // 可选的API密钥用于认证
   apiKey?: string;
+  // Optional proxy configuration
+  // 可选的代理配置
+  proxy?: ProxyConfig;
 }
 
 export interface TokenInfo {

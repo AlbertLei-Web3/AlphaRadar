@@ -4,7 +4,20 @@ import { GMGNConfig, FilterConditions } from '../modules/gmgn/types';
 // GMGN API配置
 export const gmgnConfig: GMGNConfig = {
   apiHost: 'https://api.gmgn.ai',
-  apiKey: process.env.GMGN_API_KEY || ''
+  apiKey: process.env.GMGN_API_KEY || '',
+  // Proxy configuration (optional)
+  // 代理配置（可选）
+  proxy: process.env.USE_PROXY === 'true' ? {
+    host: process.env.PROXY_HOST || '',
+    port: parseInt(process.env.PROXY_PORT || '8080'),
+    protocol: (process.env.PROXY_PROTOCOL || 'http') as 'http' | 'https',
+    ...(process.env.PROXY_USERNAME && process.env.PROXY_PASSWORD ? {
+      auth: {
+        username: process.env.PROXY_USERNAME,
+        password: process.env.PROXY_PASSWORD
+      }
+    } : {})
+  } : undefined
 };
 
 export const defaultFilterConditions: FilterConditions = {
