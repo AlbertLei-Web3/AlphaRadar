@@ -12,9 +12,11 @@
     "test": "jest"
   },
   "dependencies": {
+    "dotenv": "^16.5.0",
     "events": "^3.3.0",
     "https-proxy-agent": "^7.0.6",
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.7",
+    "socks-proxy-agent": "^8.0.5"
   },
   "devDependencies": {
     "@types/jest": "^29.2.0",

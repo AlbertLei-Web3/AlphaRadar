@@ -7,9 +7,9 @@ export interface ProxyConfig {
   // Proxy server port number
   // 代理服务器端口号
   port: number;
-  // Proxy protocol (http or https)
-  // 代理协议（http或https）
-  protocol: 'http' | 'https';
+  // Proxy protocol (http, https, or socks5)
+  // 代理协议（http、https或socks5）
+  protocol: 'http' | 'https' | 'socks5';
   // Optional authentication credentials
   // 可选的认证凭据
   auth?: {

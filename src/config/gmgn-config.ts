@@ -3,14 +3,18 @@ import { GMGNConfig, FilterConditions } from '../modules/gmgn/types';
 // GMGN API configuration
 // GMGN API配置
 export const gmgnConfig: GMGNConfig = {
-  apiHost: 'https://api.gmgn.ai',
+  apiHost: 'https://gmgn.ai',
   apiKey: process.env.GMGN_API_KEY || '',
   // Proxy configuration (optional)
   // 代理配置（可选）
   proxy: process.env.USE_PROXY === 'true' ? {
     host: process.env.PROXY_HOST || '',
-    port: parseInt(process.env.PROXY_PORT || '8080'),
-    protocol: (process.env.PROXY_PROTOCOL || 'http') as 'http' | 'https',
+    // Use Shadowsocks port from V2rayN
+    // 使用V2rayN的Shadowsocks端口
+    port: parseInt(process.env.PROXY_PORT || '33002'),
+    // Use SOCKS5 protocol for Shadowsocks
+    // 使用SOCKS5协议用于Shadowsocks
+    protocol: 'socks5',
     ...(process.env.PROXY_USERNAME && process.env.PROXY_PASSWORD ? {
       auth: {
         username: process.env.PROXY_USERNAME,
