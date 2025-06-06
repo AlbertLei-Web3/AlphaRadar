@@ -3,13 +3,13 @@
  * 信号评估器核心模块
  * 
  * This module is responsible for evaluating trading signals based on multiple factors:
- * - Telegram mentions and their growth rate
+ * - Multiple sentiment sources (Telegram, Twitter, Reddit, Google Trends, etc.)
  * - Recent buy pressure from trades
  * - Blacklist status and age
  * - Signal resonance from multiple sources
  * 
  * 该模块负责基于多个因素评估交易信号：
- * - Telegram提及及其增长率
+ * - 多个舆情来源（Telegram、Twitter、Reddit、Google趋势等）
  * - 最近的交易买入压力
  * - 黑名单状态和年龄
  * - 来自多个来源的信号共振
@@ -18,11 +18,13 @@
  * - ../types/score.ts: Contains score-related types and constants
  * - ../types/signal.ts: Contains signal-related types and interfaces
  * - ../utils/logger.ts: Provides logging functionality
+ * - ../sources/: Contains sentiment source implementations
  * 
  * 相关文件：
  * - ../types/score.ts: 包含评分相关的类型和常量
  * - ../types/signal.ts: 包含信号相关的类型和接口
  * - ../utils/logger.ts: 提供日志功能
+ * - ../sources/: 包含舆情来源实现
  * 
  * Usage Example:
  * const evaluator = new SignalEvaluator();
@@ -55,20 +57,88 @@ import {
     SignalEvaluationInput, 
     TelegramMention, 
     TradeData, 
-    BlacklistEntry 
+    BlacklistEntry,
+    SentimentData
 } from '../types/signal';
 import { logger } from '../utils/logger';
+
+// Sentiment source interface
+// Defines the contract for all sentiment data sources
+// 舆情来源接口
+// 定义所有舆情数据源的契约
+interface SentimentSource {
+    // Get sentiment data for a token
+    // 获取代币的舆情数据
+    getSentimentData(tokenAddress: string, timeWindow: number): Promise<SentimentData[]>;
+    
+    // Get source weight in overall sentiment calculation
+    // 获取在整体舆情计算中的权重
+    getWeight(): number;
+    
+    // Get source name
+    // 获取来源名称
+    getName(): string;
+}
+
+// Sentiment manager class
+// Manages multiple sentiment sources and aggregates their data
+// 舆情管理器类
+// 管理多个舆情来源并聚合它们的数据
+class SentimentManager {
+    private sources: Map<string, SentimentSource> = new Map();
+
+    // Add a sentiment source
+    // 添加舆情来源
+    addSource(source: SentimentSource): void {
+        this.sources.set(source.getName(), source);
+    }
+
+    // Remove a sentiment source
+    // 移除舆情来源
+    removeSource(sourceName: string): void {
+        this.sources.delete(sourceName);
+    }
+
+    // Get all sentiment data from all sources
+    // 从所有来源获取舆情数据
+    async getAllSentimentData(tokenAddress: string, timeWindow: number): Promise<SentimentData[]> {
+        const allData: SentimentData[] = [];
+        
+        for (const source of this.sources.values()) {
+            try {
+                const sourceData = await source.getSentimentData(tokenAddress, timeWindow);
+                allData.push(...sourceData);
+            } catch (error: unknown) {
+                logger.error(
+                    `Error getting sentiment data from ${source.getName()}`,
+                    error instanceof Error ? error : new Error(String(error))
+                );
+            }
+        }
+
+        return allData;
+    }
+
+    // Get total weight of all sources
+    // 获取所有来源的总权重
+    getTotalWeight(): number {
+        return Array.from(this.sources.values()).reduce(
+            (total, source) => total + source.getWeight(),
+            0
+        );
+    }
+}
 
 // Scoring configuration interface
 // Defines the structure for all scoring parameters and thresholds
 // 评分配置接口
 // 定义所有评分参数和阈值的结构
 interface ScoringConfig {
-    // Heat score configuration
-    // Defines thresholds and weights for telegram mention growth
-    // 热度评分配置
-    // 定义telegram提及增长的阈值和权重
-    heatScore: {
+    // Sentiment configuration
+    // Defines thresholds and weights for sentiment analysis
+    // 舆情配置
+    // 定义舆情分析的阈值和权重
+    sentiment: {
         thresholds: {
             high: number;    // e.g., 0.5 for 50% growth
             medium: number;  // e.g., 0.3 for 30% growth
@@ -133,7 +203,7 @@ interface ScoringConfig {
 // 默认评分配置
 // 创建新的SignalEvaluator实例时可以覆盖这些值
 const DEFAULT_CONFIG: ScoringConfig = {
-    heatScore: {
+    sentiment: {
         thresholds: {
             high: 0.5,    // 50% growth
             medium: 0.3,  // 30% growth
@@ -181,33 +251,48 @@ const DEFAULT_CONFIG: ScoringConfig = {
     }
 };
 
-// Heat score calculation with time decay
-// Calculates score based on telegram mention growth rate and applies time decay
-// 带时间衰减的热度评分计算
-// 基于telegram提及增长率计算分数并应用时间衰减
-function calcHeatScore(mentions: TelegramMention[], config: ScoringConfig['heatScore']): number {
+// Sentiment score calculation with time decay
+// Calculates score based on sentiment data from multiple sources
+// 带时间衰减的舆情评分计算
+// 基于多个来源的舆情数据计算分数
+async function calcSentimentScore(
+    sentimentManager: SentimentManager,
+    tokenAddress: string,
+    config: ScoringConfig['sentiment']
+): Promise<number> {
     try {
         const now = Date.now();
         const timeWindow = config.timeWindow;
         const previousWindow = now - (timeWindow * 2);
 
-        // Calculate mentions in current and previous window
-        // 计算当前和前一窗口的提及次数
-        const currentMentions = mentions.filter(m => m.timestamp >= now - timeWindow).length;
-        const previousMentions = mentions.filter(m => 
-            m.timestamp >= previousWindow && m.timestamp < now - timeWindow
-        ).length;
+        // Get sentiment data from all sources
+        // 从所有来源获取舆情数据
+        const allSentimentData = await sentimentManager.getAllSentimentData(tokenAddress, timeWindow);
 
-        // Calculate growth rate with validation
-        // 计算增长率并进行验证
-        const growthRate = previousMentions === 0 ? 0 : 
-            (currentMentions - previousMentions) / previousMentions;
+        // Calculate current and previous window sentiment
+        // 计算当前和前一窗口的舆情
+        const currentSentiment = allSentimentData.filter(d => d.timestamp >= now - timeWindow);
+        const previousSentiment = allSentimentData.filter(d => 
+            d.timestamp >= previousWindow && d.timestamp < now - timeWindow
+        );
+
+        // Calculate weighted sentiment scores
+        // 计算加权舆情分数
+        const currentScore = currentSentiment.reduce((sum, data) => 
+            sum + (data.score * data.sourceWeight), 0
+        );
+        const previousScore = previousSentiment.reduce((sum, data) => 
+            sum + (data.score * data.sourceWeight), 0
+        );
+
+        // Calculate growth rate
+        // 计算增长率
+        const growthRate = previousScore === 0 ? 0 : 
+            (currentScore - previousScore) / previousScore;
 
         // Apply time decay
-        // The more recent the mentions, the higher the score
         // 应用时间衰减
-        // 提及越新，分数越高
-        const timeDecay = 1 - (TIME_DECAY_FACTOR * (now - Math.max(...mentions.map(m => m.timestamp))) / timeWindow);
+        const timeDecay = 1 - (TIME_DECAY_FACTOR * (now - Math.max(...allSentimentData.map(d => d.timestamp))) / timeWindow);
 
         // Score based on growth rate and thresholds
         // 基于增长率和阈值评分
@@ -220,7 +305,7 @@ function calcHeatScore(mentions: TelegramMention[], config: ScoringConfig['heatS
         }
         return 0;
     } catch (error: unknown) {
-        logger.error('Error calculating heat score', error instanceof Error ? error : new Error(String(error)));
+        logger.error('Error calculating sentiment score', error instanceof Error ? error : new Error(String(error)));
         return 0;
     }
 }
@@ -333,6 +418,7 @@ function calcResonanceScore(
 // 处理完整的信号评估过程
 export class SignalEvaluator {
     private config: ScoringConfig;
+    private sentimentManager: SentimentManager;
 
     // Constructor with optional configuration override
     // 带有可选配置覆盖的构造函数
@@ -341,6 +427,19 @@ export class SignalEvaluator {
             ...DEFAULT_CONFIG,
             ...config
         };
+        this.sentimentManager = new SentimentManager();
+    }
+
+    // Add a sentiment source
+    // 添加舆情来源
+    public addSentimentSource(source: SentimentSource): void {
+        this.sentimentManager.addSource(source);
+    }
+
+    // Remove a sentiment source
+    // 移除舆情来源
+    public removeSentimentSource(sourceName: string): void {
+        this.sentimentManager.removeSource(sourceName);
     }
 
     // Evaluate a signal
@@ -356,7 +455,11 @@ export class SignalEvaluator {
             // Calculate component scores
             // 计算组件分数
             const components: ScoreComponents = {
-                heatScore: calcHeatScore(input.telegramMentions, this.config.heatScore),
+                sentimentScore: await calcSentimentScore(
+                    this.sentimentManager,
+                    input.signal.tokenAddress,
+                    this.config.sentiment
+                ),
                 buyPressureScore: calcBuyPressureScore(input.trades, this.config.buyPressure),
                 blacklistPenalty: calcBlacklistPenalty(input.blacklistStatus, this.config.blacklist),
                 resonanceScore: calcResonanceScore(input.triggeredSignals, this.config.resonance)
@@ -365,7 +468,7 @@ export class SignalEvaluator {
             // Calculate total score
             // 计算总分
             const totalScore = Math.min(100, 
-                components.heatScore + 
+                components.sentimentScore + 
                 components.buyPressureScore + 
                 components.blacklistPenalty + 
                 components.resonanceScore
@@ -418,12 +521,12 @@ export class SignalEvaluator {
     private calculateConfidence(components: ScoreComponents): number {
         try {
             const maxPossibleScore = 
-                this.config.heatScore.weights.high +
+                this.config.sentiment.weights.high +
                 this.config.buyPressure.weights.high +
                 this.config.resonance.weights.high;
 
             const actualScore = 
-                components.heatScore + 
+                components.sentimentScore + 
                 components.buyPressureScore + 
                 components.resonanceScore;
 
@@ -441,8 +544,8 @@ export class SignalEvaluator {
     private generateReasons(components: ScoreComponents): string[] {
         const reasons: string[] = [];
 
-        if (components.heatScore > 0) {
-            reasons.push(`Heat score: ${components.heatScore.toFixed(2)} (TG mentions growth)`);
+        if (components.sentimentScore > 0) {
+            reasons.push(`Sentiment score: ${components.sentimentScore.toFixed(2)} (multiple sources)`);
         }
         if (components.buyPressureScore > 0) {
             reasons.push(`Buy pressure: ${components.buyPressureScore.toFixed(2)} (recent buy trades)`);
