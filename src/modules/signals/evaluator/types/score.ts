@@ -4,10 +4,21 @@
 // Score components interface
 // 评分组件接口
 export interface ScoreComponents {
-    heatScore: number;         // Emotional heat score based on TG mentions
-    buyPressureScore: number;  // Buy pressure score based on on-chain trades
-    blacklistPenalty: number;  // Blacklist penalty score (negative)
-    resonanceScore: number;    // GMGN signal resonance score
+    // Sentiment score from multiple sources
+    // 来自多个来源的舆情分数
+    sentimentScore: number;
+    
+    // Buy pressure score
+    // 买入压力分数
+    buyPressureScore: number;
+    
+    // Blacklist penalty
+    // 黑名单惩罚
+    blacklistPenalty: number;
+    
+    // Resonance score
+    // 共振分数
+    resonanceScore: number;
 }
 
 // Signal types from GMGN
@@ -28,25 +39,47 @@ export enum SignalType {
 // Evaluation result interface
 // 评估结果接口
 export interface EvaluationResult {
-    totalScore: number;        // Total score (0-100)
-    components: ScoreComponents; // Individual component scores
-    confidence: number;        // Confidence level (0-1)
-    timestamp: number;         // Evaluation timestamp
-    reasons: string[];         // Reasons for the score
+    // Total score (0-100)
+    // 总分（0-100）
+    totalScore: number;
+    
+    // Individual score components
+    // 各个分数组件
+    components: ScoreComponents;
+    
+    // Confidence level (0-1)
+    // 置信度（0-1）
+    confidence: number;
+    
+    // Timestamp of evaluation
+    // 评估时间戳
+    timestamp: number;
+    
+    // Reasons for the score
+    // 分数原因
+    reasons: string[];
 }
 
 // Score thresholds
 // 分数阈值
 export const SCORE_THRESHOLDS = {
-    REJECT: 30,               // Below this score, signal is rejected
-    MANUAL_REVIEW: 60,        // Between this and REJECT, manual review needed
-    AUTO_PROCESS: 60          // Above this score, auto-process
-} as const;
+    // Minimum score for a valid signal
+    // 有效信号的最低分数
+    MIN_VALID_SCORE: 50,
+    
+    // High confidence threshold
+    // 高置信度阈值
+    HIGH_CONFIDENCE: 0.8,
+    
+    // Medium confidence threshold
+    // 中等置信度阈值
+    MEDIUM_CONFIDENCE: 0.5
+};
 
-// Time decay factor
-// 时间衰减因子
-export const TIME_DECAY_FACTOR = 0.1; // 10% decay per hour
+// Time decay factor for sentiment scores
+// 舆情分数的时间衰减因子
+export const TIME_DECAY_FACTOR = 0.1;
 
-// Age factor for blacklist penalty
+// Age factor for blacklist penalties
 // 黑名单惩罚的年龄因子
-export const AGE_FACTOR = 0.05; // 5% increase per day 
+export const AGE_FACTOR = 0.05; 

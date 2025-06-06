@@ -49,7 +49,6 @@ import {
     ScoreComponents, 
     EvaluationResult, 
     SCORE_THRESHOLDS,
-    SignalType,
     TIME_DECAY_FACTOR,
     AGE_FACTOR
 } from '../types/score';
@@ -58,7 +57,8 @@ import {
     TelegramMention, 
     TradeData, 
     BlacklistEntry,
-    SentimentData
+    SentimentData,
+    SignalType
 } from '../types/signal';
 import { logger } from '../utils/logger';
 

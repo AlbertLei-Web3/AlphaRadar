@@ -3,7 +3,15 @@
 
 import { EventEmitter } from 'events';
 import { Telegraf } from 'telegraf';
-import { RawSignal } from './types';
+
+// Signal interface
+// 信号接口
+export interface RawSignal {
+    source: string;          // Signal source / 信号来源
+    content: string;         // Raw content / 原始内容
+    timestamp: number;       // Timestamp / 时间戳
+    metadata?: Record<string, any>; // Additional metadata / 额外元数据
+}
 
 // Log levels
 // 日志级别
@@ -49,15 +57,6 @@ class Logger {
     error(message: string, error?: any): void {
         console.error(this.formatMessage(LogLevel.ERROR, message, error));
     }
-}
-
-// Signal interface
-// 信号接口
-export interface RawSignal {
-    source: string;          // Signal source / 信号来源
-    content: string;         // Raw content / 原始内容
-    timestamp: number;       // Timestamp / 时间戳
-    metadata?: Record<string, any>; // Additional metadata / 额外元数据
 }
 
 // Signal Fetcher class
