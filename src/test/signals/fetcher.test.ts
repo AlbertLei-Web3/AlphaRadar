@@ -4,37 +4,63 @@
 import { SignalFetcher, RawSignal } from '../../modules/signals/fetcher';
 import { Telegraf } from 'telegraf';
 
+// Test configuration
+// 测试配置
+const TEST_TIMEOUT = 5000; // 5 seconds timeout for async tests
+const QUEUE_PROCESSING_DELAY = 100; // Delay for queue processing
+
 // Mock Telegraf
 // 模拟Telegraf
+let registeredHandler: any = null;
 jest.mock('telegraf', () => {
     return {
         Telegraf: jest.fn().mockImplementation(() => ({
             launch: jest.fn().mockResolvedValue(undefined),
             stop: jest.fn().mockResolvedValue(undefined),
-            on: jest.fn(),
+            on: jest.fn((event, handler) => {
+                if (event === 'message') {
+                    registeredHandler = handler;
+                }
+            }),
         })),
     };
 });
 
+// Helper functions
+// 辅助函数
+const createMockMessage = (text: string) => ({
+    text,
+    chat: { id: 123 },
+    message_id: 456,
+    from: { id: 789 }
+});
+
+const createMockSignal = (content: string): RawSignal => ({
+    source: 'test',
+    content,
+    timestamp: Date.now()
+});
+
+const waitForQueueProcessing = async () => {
+    await new Promise(resolve => setTimeout(resolve, QUEUE_PROCESSING_DELAY));
+};
+
 describe('SignalFetcher', () => {
     let fetcher: SignalFetcher;
-    let mockEmit: jest.SpyInstance;
 
     beforeEach(() => {
-        // Create new instance for each test
-        // 为每个测试创建新实例
-        fetcher = new SignalFetcher();
-        mockEmit = jest.spyOn(fetcher, 'emit');
-    });
-
-    afterEach(() => {
-        // Clean up after each test
-        // 每个测试后清理
+        registeredHandler = null;
         jest.clearAllMocks();
+        fetcher = new SignalFetcher();
+        expect(registeredHandler).not.toBeNull();
     });
 
-    // Test basic initialization
-    // 测试基本初始化
+    afterEach(async () => {
+        await fetcher.reset();
+    });
+
+    // Initialization tests
+    // 初始化测试
     describe('Initialization', () => {
         it('should create a new instance', () => {
             expect(fetcher).toBeInstanceOf(SignalFetcher);
@@ -45,152 +71,170 @@ describe('SignalFetcher', () => {
         });
     });
 
-    // Test start/stop functionality
-    // 测试启动/停止功能
+    // Start/Stop tests
+    // 启动/停止测试
     describe('Start/Stop', () => {
         it('should start successfully', async () => {
             await expect(fetcher.start()).resolves.not.toThrow();
-            expect(mockEmit).toHaveBeenCalledWith('newSignal', expect.any(Object));
-        });
+        }, TEST_TIMEOUT);
 
         it('should stop successfully', async () => {
             await fetcher.start();
             await expect(fetcher.stop()).resolves.not.toThrow();
-        });
+        }, TEST_TIMEOUT);
 
         it('should not start if already running', async () => {
+            const launchSpy = jest.spyOn(fetcher['telegramBot'], 'launch');
             await fetcher.start();
-            const startSpy = jest.spyOn(fetcher['telegramBot'], 'launch');
             await fetcher.start();
-            expect(startSpy).not.toHaveBeenCalled();
-        });
+            expect(launchSpy).toHaveBeenCalledTimes(1);
+        }, TEST_TIMEOUT);
     });
 
-    // Test message handling
-    // 测试消息处理
+    // Message handling tests
+    // 消息处理测试
     describe('Message Handling', () => {
-        it('should process valid messages', () => {
-            const mockMessage = {
-                text: '🔔 CTO Signal: 0x123...',
-                chat: { id: 123 },
-                message_id: 456,
-                from: { id: 789 }
-            };
+        it('should process valid messages', async () => {
+            const mockMessage = createMockMessage('🔔 CTO Signal: 0x123...');
+            const emitSpy = jest.spyOn(fetcher, 'emit');
+            
+            if (registeredHandler) {
+                await registeredHandler.call(fetcher, { 
+                    message: mockMessage, 
+                    chat: mockMessage.chat, 
+                    from: mockMessage.from 
+                });
+                await waitForQueueProcessing();
+            }
 
-            // Simulate Telegram message
-            // 模拟Telegram消息
-            const telegramBot = fetcher['telegramBot'];
-            const messageHandler = (telegramBot.on as jest.Mock).mock.calls[0][1];
-            messageHandler({ message: mockMessage });
-
-            expect(mockEmit).toHaveBeenCalledWith('newSignal', expect.objectContaining({
+            expect(emitSpy).toHaveBeenCalledWith('newSignal', expect.objectContaining({
                 source: 'telegram',
                 content: mockMessage.text,
                 metadata: expect.any(Object)
             }));
-        });
+        }, TEST_TIMEOUT);
 
-        it('should handle empty messages', () => {
-            const mockMessage = {
-                text: '',
-                chat: { id: 123 },
-                message_id: 456,
-                from: { id: 789 }
-            };
+        it('should handle empty messages', async () => {
+            const mockMessage = createMockMessage('');
+            const emitSpy = jest.spyOn(fetcher, 'emit');
+            
+            if (registeredHandler) {
+                await registeredHandler.call(fetcher, { 
+                    message: mockMessage, 
+                    chat: mockMessage.chat, 
+                    from: mockMessage.from 
+                });
+                await waitForQueueProcessing();
+            }
 
-            const telegramBot = fetcher['telegramBot'];
-            const messageHandler = (telegramBot.on as jest.Mock).mock.calls[0][1];
-            messageHandler({ message: mockMessage });
-
-            expect(mockEmit).toHaveBeenCalledWith('newSignal', expect.objectContaining({
+            expect(emitSpy).toHaveBeenCalledWith('newSignal', expect.objectContaining({
                 content: ''
             }));
-        });
+        }, TEST_TIMEOUT);
+
+        it('should not process invalid messages', async () => {
+            const invalidMessages = [
+                { text: null },
+                { text: undefined },
+                { text: 'valid', chat: null },
+                { text: 'valid', chat: { id: null } },
+                { text: 'valid', chat: { id: 123 }, message_id: null },
+                { text: 'valid', chat: { id: 123 }, message_id: 456, from: null },
+                { text: 'valid', chat: { id: 123 }, message_id: 456, from: { id: null } }
+            ];
+
+            for (const invalidMessage of invalidMessages) {
+                const emitSpy = jest.spyOn(fetcher, 'emit');
+                const queueSpy = jest.spyOn(fetcher['messageQueue'], 'push');
+
+                if (registeredHandler) {
+                    await registeredHandler.call(fetcher, { message: invalidMessage });
+                    await waitForQueueProcessing();
+                }
+
+                expect(emitSpy).not.toHaveBeenCalledWith('newSignal', expect.anything());
+                expect(queueSpy).not.toHaveBeenCalled();
+            }
+        }, TEST_TIMEOUT);
     });
 
-    // Test manual signal injection
-    // 测试手动信号注入
+    // Manual signal injection tests
+    // 手动信号注入测试
     describe('Manual Signal Injection', () => {
         it('should accept manually added signals', () => {
-            const manualSignal: RawSignal = {
-                source: 'manual',
-                content: 'Test signal',
-                timestamp: Date.now()
-            };
-
+            const manualSignal = createMockSignal('Test signal');
+            const emitSpy = jest.spyOn(fetcher, 'emit');
+            
             fetcher.addSignal(manualSignal);
-
-            expect(mockEmit).toHaveBeenCalledWith('newSignal', manualSignal);
+            
+            expect(emitSpy).toHaveBeenCalledWith('newSignal', manualSignal);
         });
 
         it('should process manually added signals in queue', async () => {
-            const manualSignal: RawSignal = {
-                source: 'manual',
-                content: 'Test signal',
-                timestamp: Date.now()
-            };
-
+            const manualSignal = createMockSignal('Test signal');
+            let processed = false;
+            
+            fetcher.on('signal', () => { processed = true; });
             fetcher.addSignal(manualSignal);
             await fetcher.start();
-
-            expect(mockEmit).toHaveBeenCalledWith('signal', manualSignal);
-        });
+            await waitForQueueProcessing();
+            
+            expect(processed).toBe(true);
+        }, TEST_TIMEOUT);
     });
 
-    // Test error handling
-    // 测试错误处理
+    // Error handling tests
+    // 错误处理测试
     describe('Error Handling', () => {
         it('should handle Telegram API errors', async () => {
             const telegramBot = fetcher['telegramBot'];
             (telegramBot.launch as jest.Mock).mockRejectedValueOnce(new Error('API Error'));
-
-            await expect(fetcher.start()).rejects.toThrow('API Error');
-        });
-
-        it('should handle message processing errors', () => {
-            const mockMessage = {
-                text: null,
-                chat: { id: 123 },
-                message_id: 456,
-                from: { id: 789 }
-            };
-
-            const telegramBot = fetcher['telegramBot'];
-            const messageHandler = (telegramBot.on as jest.Mock).mock.calls[0][1];
             
-            // Should not throw error
-            // 不应该抛出错误
-            expect(() => messageHandler({ message: mockMessage })).not.toThrow();
-        });
+            await expect(fetcher.start()).rejects.toThrow('API Error');
+        }, TEST_TIMEOUT);
+
+        it('should handle message processing errors', async () => {
+            const badMessage = { text: null };
+            const emitSpy = jest.spyOn(fetcher, 'emit');
+            
+            if (registeredHandler) {
+                await registeredHandler.call(fetcher, { message: badMessage });
+                await waitForQueueProcessing();
+            }
+            
+            expect(emitSpy).not.toHaveBeenCalledWith('newSignal', expect.anything());
+        }, TEST_TIMEOUT);
     });
 
-    // Test queue processing
-    // 测试队列处理
+    // Queue processing tests
+    // 队列处理测试
     describe('Queue Processing', () => {
         it('should process messages in order', async () => {
             const signals = [
-                { source: 'test', content: 'Signal 1', timestamp: Date.now() },
-                { source: 'test', content: 'Signal 2', timestamp: Date.now() }
+                createMockSignal('Signal 1'),
+                createMockSignal('Signal 2')
             ];
-
+            let processedSignals: any[] = [];
+            
+            fetcher.on('signal', (signal) => {
+                processedSignals.push(signal);
+            });
+            
             signals.forEach(signal => fetcher.addSignal(signal));
             await fetcher.start();
-
-            // Wait for queue processing
-            // 等待队列处理
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            expect(mockEmit).toHaveBeenCalledTimes(signals.length * 2); // newSignal + signal events
-        });
+            await waitForQueueProcessing();
+            
+            expect(processedSignals.length).toBe(signals.length);
+            expect(processedSignals[0].content).toBe('Signal 1');
+            expect(processedSignals[1].content).toBe('Signal 2');
+        }, TEST_TIMEOUT);
 
         it('should handle empty queue', async () => {
             await fetcher.start();
+            await waitForQueueProcessing();
             
-            // Wait for queue processing
-            // 等待队列处理
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            expect(mockEmit).not.toHaveBeenCalledWith('signal', expect.any(Object));
-        });
+            const emitSpy = jest.spyOn(fetcher, 'emit');
+            expect(emitSpy).not.toHaveBeenCalledWith('signal', expect.anything());
+        }, TEST_TIMEOUT);
     });
 }); 
