@@ -1,5 +1,47 @@
-// Signal Evaluator Core
-// 信号评估器核心
+/**
+ * Signal Evaluator Core Module
+ * 信号评估器核心模块
+ * 
+ * This module is responsible for evaluating trading signals based on multiple factors:
+ * - Telegram mentions and their growth rate
+ * - Recent buy pressure from trades
+ * - Blacklist status and age
+ * - Signal resonance from multiple sources
+ * 
+ * 该模块负责基于多个因素评估交易信号：
+ * - Telegram提及及其增长率
+ * - 最近的交易买入压力
+ * - 黑名单状态和年龄
+ * - 来自多个来源的信号共振
+ * 
+ * Related Files:
+ * - ../types/score.ts: Contains score-related types and constants
+ * - ../types/signal.ts: Contains signal-related types and interfaces
+ * - ../utils/logger.ts: Provides logging functionality
+ * 
+ * 相关文件：
+ * - ../types/score.ts: 包含评分相关的类型和常量
+ * - ../types/signal.ts: 包含信号相关的类型和接口
+ * - ../utils/logger.ts: 提供日志功能
+ * 
+ * Usage Example:
+ * const evaluator = new SignalEvaluator();
+ * const result = await evaluator.evaluate({
+ *   signal: { tokenAddress: '0x...' },
+ *   telegramMentions: [...],
+ *   trades: [...],
+ *   triggeredSignals: [...]
+ * });
+ * 
+ * 使用示例：
+ * const evaluator = new SignalEvaluator();
+ * const result = await evaluator.evaluate({
+ *   signal: { tokenAddress: '0x...' },
+ *   telegramMentions: [...],
+ *   trades: [...],
+ *   triggeredSignals: [...]
+ * });
+ */
 
 import { 
     ScoreComponents, 
@@ -17,9 +59,15 @@ import {
 } from '../types/signal';
 import { logger } from '../utils/logger';
 
-// Scoring configuration
-// 评分配置
+// Scoring configuration interface
+// Defines the structure for all scoring parameters and thresholds
+// 评分配置接口
+// 定义所有评分参数和阈值的结构
 interface ScoringConfig {
+    // Heat score configuration
+    // Defines thresholds and weights for telegram mention growth
+    // 热度评分配置
+    // 定义telegram提及增长的阈值和权重
     heatScore: {
         thresholds: {
             high: number;    // e.g., 0.5 for 50% growth
@@ -33,6 +81,10 @@ interface ScoringConfig {
         };
         timeWindow: number;  // in milliseconds
     };
+    // Buy pressure configuration
+    // Defines thresholds and weights for recent buy trades
+    // 买入压力配置
+    // 定义最近买入交易的阈值和权重
     buyPressure: {
         thresholds: {
             high: number;    // e.g., 10 trades
@@ -46,6 +98,10 @@ interface ScoringConfig {
         };
         timeWindow: number;  // in milliseconds
     };
+    // Blacklist configuration
+    // Defines penalties for blacklisted tokens
+    // 黑名单配置
+    // 定义黑名单代币的惩罚
     blacklist: {
         penalties: {
             high: number;    // e.g., -20 points
@@ -54,6 +110,10 @@ interface ScoringConfig {
         };
         ageFactor: number;   // e.g., 0.05 for 5% increase per day
     };
+    // Resonance configuration
+    // Defines thresholds and weights for signal resonance
+    // 共振配置
+    // 定义信号共振的阈值和权重
     resonance: {
         thresholds: {
             high: number;    // e.g., 4 signals
@@ -69,7 +129,9 @@ interface ScoringConfig {
 }
 
 // Default scoring configuration
+// These values can be overridden when creating a new SignalEvaluator instance
 // 默认评分配置
+// 创建新的SignalEvaluator实例时可以覆盖这些值
 const DEFAULT_CONFIG: ScoringConfig = {
     heatScore: {
         thresholds: {
@@ -120,7 +182,9 @@ const DEFAULT_CONFIG: ScoringConfig = {
 };
 
 // Heat score calculation with time decay
+// Calculates score based on telegram mention growth rate and applies time decay
 // 带时间衰减的热度评分计算
+// 基于telegram提及增长率计算分数并应用时间衰减
 function calcHeatScore(mentions: TelegramMention[], config: ScoringConfig['heatScore']): number {
     try {
         const now = Date.now();
@@ -140,7 +204,9 @@ function calcHeatScore(mentions: TelegramMention[], config: ScoringConfig['heatS
             (currentMentions - previousMentions) / previousMentions;
 
         // Apply time decay
+        // The more recent the mentions, the higher the score
         // 应用时间衰减
+        // 提及越新，分数越高
         const timeDecay = 1 - (TIME_DECAY_FACTOR * (now - Math.max(...mentions.map(m => m.timestamp))) / timeWindow);
 
         // Score based on growth rate and thresholds
@@ -160,14 +226,18 @@ function calcHeatScore(mentions: TelegramMention[], config: ScoringConfig['heatS
 }
 
 // Buy pressure score calculation with validation
+// Calculates score based on recent buy trades with amount and price validation
 // 带验证的买入压力评分计算
+// 基于最近的买入交易计算分数，包括数量和价格验证
 function calcBuyPressureScore(trades: TradeData[], config: ScoringConfig['buyPressure']): number {
     try {
         const now = Date.now();
         const timeWindow = config.timeWindow;
 
         // Validate and filter trades
+        // Only count valid buy trades within the time window
         // 验证和过滤交易
+        // 只计算时间窗口内的有效买入交易
         const validTrades = trades.filter(t => 
             t.timestamp >= now - timeWindow && 
             t.type === 'buy' &&
@@ -196,7 +266,9 @@ function calcBuyPressureScore(trades: TradeData[], config: ScoringConfig['buyPre
 }
 
 // Blacklist penalty calculation with age factor
+// Calculates penalty based on blacklist severity and age
 // 带年龄因子的黑名单惩罚计算
+// 基于黑名单严重程度和年龄计算惩罚
 function calcBlacklistPenalty(
     blacklistStatus: BlacklistEntry | undefined, 
     config: ScoringConfig['blacklist']
@@ -204,12 +276,14 @@ function calcBlacklistPenalty(
     try {
         if (!blacklistStatus) return 0;
 
-        // Get base penalty
-        // 获取基础惩罚
+        // Get base penalty based on severity
+        // 基于严重程度获取基础惩罚
         const basePenalty = config.penalties[blacklistStatus.severity] || 0;
 
         // Apply age factor
+        // Older blacklist entries have higher penalties
         // 应用年龄因子
+        // 较老的黑名单条目有更高的惩罚
         const ageFactor = 1 + (blacklistStatus.age * config.ageFactor);
         return basePenalty * ageFactor;
     } catch (error: unknown) {
@@ -219,14 +293,18 @@ function calcBlacklistPenalty(
 }
 
 // Resonance score calculation with validation
+// Calculates score based on number of unique triggered signals
 // 带验证的共振评分计算
+// 基于唯一触发信号的数量计算分数
 function calcResonanceScore(
     triggeredSignals: SignalType[], 
     config: ScoringConfig['resonance']
 ): number {
     try {
         // Validate signals
+        // Ensure all signals are valid SignalType values
         // 验证信号
+        // 确保所有信号都是有效的SignalType值
         const validSignals = triggeredSignals.filter(signal => 
             Object.values(SignalType).includes(signal)
         );
@@ -250,10 +328,14 @@ function calcResonanceScore(
 }
 
 // Main evaluator class
+// Handles the complete signal evaluation process
 // 主评估器类
+// 处理完整的信号评估过程
 export class SignalEvaluator {
     private config: ScoringConfig;
 
+    // Constructor with optional configuration override
+    // 带有可选配置覆盖的构造函数
     constructor(config: Partial<ScoringConfig> = {}) {
         this.config = {
             ...DEFAULT_CONFIG,
@@ -262,7 +344,9 @@ export class SignalEvaluator {
     }
 
     // Evaluate a signal
+    // Main method that processes the signal and returns evaluation result
     // 评估信号
+    // 处理信号并返回评估结果的主方法
     async evaluate(input: SignalEvaluationInput): Promise<EvaluationResult> {
         try {
             // Validate input
@@ -309,7 +393,9 @@ export class SignalEvaluator {
     }
 
     // Validate input data
+    // Ensures all required fields are present and valid
     // 验证输入数据
+    // 确保所有必需字段都存在且有效
     private validateInput(input: SignalEvaluationInput): void {
         if (!input.signal || !input.signal.tokenAddress) {
             throw new Error('Invalid signal input: missing token address');
@@ -326,7 +412,9 @@ export class SignalEvaluator {
     }
 
     // Calculate confidence level
+    // Determines how confident we are in the evaluation
     // 计算置信度
+    // 确定我们对评估的置信程度
     private calculateConfidence(components: ScoreComponents): number {
         try {
             const maxPossibleScore = 
@@ -347,7 +435,9 @@ export class SignalEvaluator {
     }
 
     // Generate reasons for the score
+    // Creates human-readable explanations for the score components
     // 生成分数原因
+    // 为分数组件创建人类可读的解释
     private generateReasons(components: ScoreComponents): string[] {
         const reasons: string[] = [];
 
@@ -368,7 +458,9 @@ export class SignalEvaluator {
     }
 
     // Update configuration
+    // Allows dynamic updates to scoring rules
     // 更新配置
+    // 允许动态更新评分规则
     public updateConfig(newConfig: Partial<ScoringConfig>): void {
         this.config = {
             ...this.config,
