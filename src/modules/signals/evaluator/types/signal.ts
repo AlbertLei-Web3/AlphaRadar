@@ -266,4 +266,47 @@ export interface ScoreComponents {
     // Resonance score
     // 共振分数
     resonanceScore: number;
+}
+
+// Signal mention interface
+// 信号提及接口
+export interface SignalMention {
+    symbol: string;
+    timestamp: number;
+    content: string;
+    source: string;
+    signalType?: GMGNSignalType;
+    metadata: {
+        type: string;
+        [key: string]: any;
+    };
+}
+
+// Signal data interface
+// 信号数据接口
+export interface SignalData {
+    price?: number;
+    volume?: number;
+    fdv?: number;
+    burnAmount?: number;
+    socialUpdate?: {
+        twitter: boolean;
+        telegram: boolean;
+        website: boolean;
+    };
+}
+
+// Signal interface
+// 信号接口
+export interface Signal {
+    symbol: string;
+    timestamp: number;
+    content: string;
+    source: string;
+    signalType?: GMGNSignalType;
+    metadata: {
+        type: string;
+        signalData?: SignalData;
+        [key: string]: any;
+    };
 } 

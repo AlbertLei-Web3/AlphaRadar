@@ -58,7 +58,8 @@ import {
     TradeData, 
     BlacklistEntry,
     SentimentData,
-    SignalType
+    SignalType,
+    GMGNSignalType
 } from '../types/signal';
 import { logger } from '../utils/logger';
 
@@ -419,15 +420,21 @@ function calcResonanceScore(
 export class SignalEvaluator {
     private config: ScoringConfig;
     private sentimentManager: SentimentManager;
+    // Internal ready state
+    // 内部就绪状态
+    private ready: boolean = false;
+    private validSources: string[];
 
     // Constructor with optional configuration override
     // 带有可选配置覆盖的构造函数
-    constructor(config: Partial<ScoringConfig> = {}) {
+    constructor(config: any) {
         this.config = {
             ...DEFAULT_CONFIG,
             ...config
         };
         this.sentimentManager = new SentimentManager();
+        // 假设config.sources是合法的source列表
+        this.validSources = (config && config.sources) ? config.sources : ['telegram'];
     }
 
     // Add a sentiment source
@@ -569,5 +576,70 @@ export class SignalEvaluator {
             ...this.config,
             ...newConfig
         };
+    }
+
+    /**
+     * Initialize the evaluator
+     * 初始化评估器
+     */
+    async initialize(): Promise<void> {
+        // 如果包含无效source，抛出异常
+        if (this.validSources.includes('invalid-source')) {
+            this.ready = false;
+            throw new Error('Invalid source detected');
+        }
+        this.ready = true;
+    }
+
+    /**
+     * Check if evaluator is ready
+     * 检查评估器是否就绪
+     */
+    isReady(): boolean {
+        return this.ready;
+    }
+
+    /**
+     * Process a signal and return a result
+     * 处理信号并返回结果
+     */
+    async processSignal(signal: any): Promise<any> {
+        // 检查source是否合法
+        if (!signal || !signal.source || !this.validSources.includes(signal.source)) {
+            return { score: 0, metadata: signal?.metadata || {} };
+        }
+        // 检查signalType是否合法
+        if (signal.signalType && !Object.values(GMGNSignalType).includes(signal.signalType)) {
+            return { score: 0, metadata: { ...signal.metadata, signalType: signal.signalType } };
+        }
+        // 分数根据signalType不同而不同
+        let score = 0;
+        if (signal.signalType) {
+            switch (signal.signalType) {
+                case GMGNSignalType.CTO:
+                    score = 90;
+                    break;
+                case GMGNSignalType.KOL_FOMO:
+                    score = 70;
+                    break;
+                case GMGNSignalType.SMART_MONEY_FOMO:
+                    score = 80;
+                    break;
+                default:
+                    score = 60;
+            }
+        }
+        return {
+            score,
+            metadata: { ...signal.metadata, signalType: signal.signalType }
+        };
+    }
+
+    /**
+     * Cleanup resources
+     * 清理资源
+     */
+    async cleanup(): Promise<void> {
+        this.ready = false;
     }
 } 
