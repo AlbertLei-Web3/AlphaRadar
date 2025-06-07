@@ -25,6 +25,54 @@ export enum SignalType {
     CUSTOM = 'CUSTOM'
 }
 
+// GMGN Signal types
+// GMGN信号类型
+export enum GMGNSignalType {
+    // Community takeover signal
+    // 社区接管信号
+    CTO = 'CTO',
+    
+    // Update social info signal
+    // 更新社交信息信号
+    UPDATE_SOCIAL = 'UPDATE_SOCIAL',
+    
+    // PUMP social info update
+    // PUMP社交信息更新
+    PUMP_SOCIAL = 'PUMP_SOCIAL',
+    
+    // PUMP FDV surge
+    // PUMP内盘代币快速飙升
+    PUMP_FDV_SURGE = 'PUMP_FDV_SURGE',
+    
+    // Solana FDV surge
+    // Solana代币快速飙升
+    SOL_FDV_SURGE = 'SOL_FDV_SURGE',
+    
+    // Smart money FOMO
+    // 聪明钱FOMO
+    SMART_MONEY_FOMO = 'SMART_MONEY_FOMO',
+    
+    // KOL FOMO
+    // KOL FOMO
+    KOL_FOMO = 'KOL_FOMO',
+    
+    // Developer burn alert
+    // 开发者烧币提醒
+    DEV_BURN = 'DEV_BURN',
+    
+    // ATH price alert
+    // 历史新高提醒
+    ATH_PRICE = 'ATH_PRICE',
+    
+    // Heavy buy alert
+    // 大单买入提醒
+    HEAVY_BUY = 'HEAVY_BUY',
+    
+    // New token sniper
+    // 新币狙击
+    SNIPER_NEW = 'SNIPER_NEW'
+}
+
 // Telegram mention interface
 // Telegram提及接口
 export interface TelegramMention {
@@ -44,10 +92,41 @@ export interface TelegramMention {
     // 原始消息内容
     content: string;
     
+    // Signal type if detected
+    // 检测到的信号类型
+    signalType?: GMGNSignalType;
+    
     // Additional metadata
     // 额外元数据
     metadata: {
         type: string;
+        // Signal-specific data
+        // 信号特定数据
+        signalData?: {
+            // Price data for ATH signals
+            // ATH信号的价格数据
+            price?: number;
+            
+            // Volume data for heavy buy signals
+            // 大单买入信号的成交量数据
+            volume?: number;
+            
+            // Burn amount for burn signals
+            // 烧币信号的烧毁数量
+            burnAmount?: number;
+            
+            // FDV data for surge signals
+            // 飙升信号的FDV数据
+            fdv?: number;
+            
+            // Social media update status
+            // 社交媒体更新状态
+            socialUpdate?: {
+                twitter?: boolean;
+                telegram?: boolean;
+                website?: boolean;
+            };
+        };
         [key: string]: any;
     };
 }

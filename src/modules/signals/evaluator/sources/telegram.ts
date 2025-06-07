@@ -6,6 +6,7 @@ import { Message } from 'telegraf/typings/core/types/typegram';
 import { SentimentSource, SourceConfig } from './base';
 import { SentimentData, TelegramMention } from '../types/signal';
 import { logger } from '../utils/logger';
+import { GMGNSignalType } from '../types/signal';
 
 // Telegram source configuration
 // Telegram数据源配置
@@ -121,19 +122,124 @@ export class TelegramSource implements SentimentSource {
         if (matches) {
             for (const match of matches) {
                 const symbol = match.substring(1); // Remove $ prefix
+                
+                // Detect signal type
+                // 检测信号类型
+                const signalType = this.detectSignalType(text);
+                
+                // Extract signal-specific data
+                // 提取信号特定数据
+                const signalData = this.extractSignalData(text, signalType);
+                
                 mentions.push({
                     symbol,
                     timestamp,
                     source: 'telegram',
                     content: text,
+                    signalType,
                     metadata: {
-                        type: 'mention'
+                        type: 'mention',
+                        signalData
                     }
                 });
             }
         }
         
         return mentions;
+    }
+
+    // Detect signal type from message text
+    // 从消息文本中检测信号类型
+    private detectSignalType(text: string): GMGNSignalType | undefined {
+        const lowerText = text.toLowerCase();
+        
+        // Signal type detection patterns
+        // 信号类型检测模式
+        const patterns: [GMGNSignalType, string[]][] = [
+            [GMGNSignalType.CTO, ['cto', 'community takeover']],
+            [GMGNSignalType.UPDATE_SOCIAL, ['update social', 'social info']],
+            [GMGNSignalType.PUMP_SOCIAL, ['pump social', 'pump info']],
+            [GMGNSignalType.PUMP_FDV_SURGE, ['pump fdv', 'pump surge']],
+            [GMGNSignalType.SOL_FDV_SURGE, ['sol fdv', 'solana surge']],
+            [GMGNSignalType.SMART_MONEY_FOMO, ['smart money', 'smart fomo']],
+            [GMGNSignalType.KOL_FOMO, ['kol fomo', 'kol signal']],
+            [GMGNSignalType.DEV_BURN, ['dev burn', 'burn alert']],
+            [GMGNSignalType.ATH_PRICE, ['ath', 'all time high']],
+            [GMGNSignalType.HEAVY_BUY, ['heavy buy', 'large buy']],
+            [GMGNSignalType.SNIPER_NEW, ['sniper new', 'new token']]
+        ];
+        
+        // Check each pattern
+        // 检查每个模式
+        for (const [type, keywords] of patterns) {
+            if (keywords.some(keyword => lowerText.includes(keyword))) {
+                return type;
+            }
+        }
+        
+        return undefined;
+    }
+
+    // Extract signal-specific data from message text
+    // 从消息文本中提取信号特定数据
+    private extractSignalData(text: string, signalType?: GMGNSignalType): TelegramMention['metadata']['signalData'] {
+        if (!signalType) return undefined;
+        
+        const data: TelegramMention['metadata']['signalData'] = {};
+        
+        switch (signalType) {
+            case GMGNSignalType.ATH_PRICE:
+                // Extract price data
+                // 提取价格数据
+                const priceMatch = text.match(/\$(\d+(\.\d+)?)/);
+                if (priceMatch) {
+                    data.price = parseFloat(priceMatch[1]);
+                }
+                break;
+                
+            case GMGNSignalType.HEAVY_BUY:
+                // Extract volume data
+                // 提取成交量数据
+                const volumeMatch = text.match(/(\d+(\.\d+)?)\s*(ETH|BNB|SOL)/i);
+                if (volumeMatch) {
+                    data.volume = parseFloat(volumeMatch[1]);
+                }
+                break;
+                
+            case GMGNSignalType.DEV_BURN:
+                // Extract burn amount
+                // 提取烧毁数量
+                const burnMatch = text.match(/(\d+(\.\d+)?)\s*(ETH|BNB|SOL)/i);
+                if (burnMatch) {
+                    data.burnAmount = parseFloat(burnMatch[1]);
+                }
+                break;
+                
+            case GMGNSignalType.PUMP_FDV_SURGE:
+            case GMGNSignalType.SOL_FDV_SURGE:
+                // Extract FDV data
+                // 提取FDV数据
+                const fdvMatch = text.match(/(\d+(\.\d+)?)\s*(M|B)/i);
+                if (fdvMatch) {
+                    const value = parseFloat(fdvMatch[1]);
+                    const unit = fdvMatch[3].toUpperCase();
+                    data.fdv = unit === 'B' ? value * 1000 : value;
+                }
+                break;
+                
+            case GMGNSignalType.UPDATE_SOCIAL:
+            case GMGNSignalType.PUMP_SOCIAL:
+                // Extract social update status
+                // 提取社交更新状态
+                data.socialUpdate = {
+                    twitter: text.toLowerCase().includes('twitter'),
+                    telegram: text.toLowerCase().includes('telegram'),
+                    website: text.toLowerCase().includes('website')
+                };
+                break;
+        }
+        
+        return data;
     }
 
     // Get sentiment data for a symbol
@@ -175,9 +281,33 @@ export class TelegramSource implements SentimentSource {
     private calculateSentimentScore(mentions: TelegramMention[]): number {
         if (mentions.length === 0) return 0;
 
-        // Simple scoring based on mention frequency
-        // 基于提及频率的简单评分
+        // Base score from mention frequency
+        // 基于提及频率的基础分数
         const baseScore = Math.min(mentions.length * 10, 100);
+        
+        // Signal type multiplier
+        // 信号类型乘数
+        const signalMultiplier = mentions.reduce((sum, mention) => {
+            if (!mention.signalType) return sum + 1;
+            
+            // Different weights for different signal types
+            // 不同信号类型的不同权重
+            const weights: Record<GMGNSignalType, number> = {
+                [GMGNSignalType.CTO]: 1.5,
+                [GMGNSignalType.UPDATE_SOCIAL]: 1.2,
+                [GMGNSignalType.PUMP_SOCIAL]: 1.3,
+                [GMGNSignalType.PUMP_FDV_SURGE]: 1.4,
+                [GMGNSignalType.SOL_FDV_SURGE]: 1.4,
+                [GMGNSignalType.SMART_MONEY_FOMO]: 1.6,
+                [GMGNSignalType.KOL_FOMO]: 1.5,
+                [GMGNSignalType.DEV_BURN]: 1.3,
+                [GMGNSignalType.ATH_PRICE]: 1.4,
+                [GMGNSignalType.HEAVY_BUY]: 1.5,
+                [GMGNSignalType.SNIPER_NEW]: 1.2
+            };
+            
+            return sum + (weights[mention.signalType] || 1);
+        }, 0) / mentions.length;
         
         // Apply time decay
         // 应用时间衰减
@@ -187,7 +317,7 @@ export class TelegramSource implements SentimentSource {
             return sum + Math.exp(-age / 3600); // 1-hour decay
         }, 0) / mentions.length;
 
-        return Math.round(baseScore * timeDecay);
+        return Math.round(baseScore * signalMultiplier * timeDecay);
     }
 
     // Check if source is ready
