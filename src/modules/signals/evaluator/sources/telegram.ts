@@ -60,9 +60,10 @@ export class TelegramSource implements SentimentSource {
             
             this.ready = true;
             logger.info('Telegram source initialized successfully');
-        } catch (error) {
+        } catch (error: unknown) {
             this.ready = false;
-            throw new Error(`Failed to initialize Telegram bot: ${error.message}`);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            throw new Error(`Failed to initialize Telegram bot: ${errorMessage}`);
         }
     }
 

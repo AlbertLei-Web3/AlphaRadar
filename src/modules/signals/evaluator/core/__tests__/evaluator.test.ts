@@ -3,7 +3,9 @@
 
 import { SignalEvaluator } from '../evaluator';
 import { GMGNSignalType } from '../../types/signal';
-import { SignalScore } from '../../types/score';
+// Remove unused import
+// 移除未使用的导入
+// import { SignalScore } from '../../types/score';
 import { TelegramSource } from '../../sources/telegram';
 
 // Mock dependencies
