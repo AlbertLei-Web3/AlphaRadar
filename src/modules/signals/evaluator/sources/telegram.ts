@@ -61,8 +61,8 @@ export class TelegramSource implements SentimentSource {
             this.ready = true;
             logger.info('Telegram source initialized successfully');
         } catch (error) {
-            logger.error('Failed to initialize Telegram source:', error as Error);
-            throw error;
+            this.ready = false;
+            throw new Error(`Failed to initialize Telegram bot: ${error.message}`);
         }
     }
 
@@ -153,6 +153,10 @@ export class TelegramSource implements SentimentSource {
     private detectSignalType(text: string): GMGNSignalType | undefined {
         const lowerText = text.toLowerCase();
         
+        if (lowerText.includes('solana fdv surge') || lowerText.includes('sol fdv surge')) {
+            return GMGNSignalType.SOL_FDV_SURGE;
+        }
+        
         // Signal type detection patterns
         // 信号类型检测模式
         const patterns: [GMGNSignalType, string[]][] = [
@@ -160,13 +164,12 @@ export class TelegramSource implements SentimentSource {
             [GMGNSignalType.UPDATE_SOCIAL, ['update social', 'social info']],
             [GMGNSignalType.PUMP_SOCIAL, ['pump social', 'pump info']],
             [GMGNSignalType.PUMP_FDV_SURGE, ['pump fdv', 'pump surge']],
-            [GMGNSignalType.SOL_FDV_SURGE, ['sol fdv', 'solana surge']],
-            [GMGNSignalType.SMART_MONEY_FOMO, ['smart money', 'smart fomo']],
-            [GMGNSignalType.KOL_FOMO, ['kol fomo', 'kol signal']],
             [GMGNSignalType.DEV_BURN, ['dev burn', 'burn alert']],
             [GMGNSignalType.ATH_PRICE, ['ath', 'all time high']],
             [GMGNSignalType.HEAVY_BUY, ['heavy buy', 'large buy']],
-            [GMGNSignalType.SNIPER_NEW, ['sniper new', 'new token']]
+            [GMGNSignalType.SNIPER_NEW, ['sniper new', 'new token']],
+            [GMGNSignalType.KOL_FOMO, ['kol fomo', 'kol signal']],
+            [GMGNSignalType.SMART_MONEY_FOMO, ['smart money', 'smart fomo']]
         ];
         
         // Check each pattern

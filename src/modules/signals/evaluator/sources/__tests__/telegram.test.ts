@@ -4,15 +4,20 @@
 import { TelegramSource } from '../telegram';
 import { GMGNSignalType } from '../../types/signal';
 
-// Mock Telegraf
-// 模拟Telegraf
+// Mock Telegraf with error handling
+// 模拟Telegraf错误处理
 jest.mock('telegraf', () => {
     return {
-        Telegraf: jest.fn().mockImplementation(() => ({
-            on: jest.fn(),
-            launch: jest.fn().mockResolvedValue(undefined),
-            stop: jest.fn().mockResolvedValue(undefined)
-        }))
+        Telegraf: jest.fn().mockImplementation((token) => {
+            if (token === 'invalid-token') {
+                throw new Error('Invalid token');
+            }
+            return {
+                on: jest.fn(),
+                launch: jest.fn().mockResolvedValue(undefined),
+                stop: jest.fn().mockResolvedValue(undefined)
+            };
+        })
     };
 });
 
