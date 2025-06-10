@@ -18,6 +18,7 @@ import os
 import sys
 from dotenv import load_dotenv
 from pyrogram import Client
+from pyrogram.errors import SessionPasswordNeeded
 
 # Load environment variables
 # 加载环境变量
@@ -68,10 +69,17 @@ def generate_session():
         # 获取验证码
         code = input("🔑 Please enter the verification code you received: ")
 
-        # Sign in
-        # 登录
-        print("🔐 Signing in...")
-        app.sign_in(phone_number, sent_code.phone_code_hash, code)
+        try:
+            # Try to sign in
+            # 尝试登录
+            print("🔐 Signing in...")
+            app.sign_in(phone_number, sent_code.phone_code_hash, code)
+        except SessionPasswordNeeded:
+            # If two-step verification is enabled, ask for password
+            # 如果开启了两步验证，请求密码
+            print("🔒 Two-step verification is enabled. Please enter your password.")
+            password = input("🔑 Please enter your two-step verification password: ")
+            app.check_password(password)
 
         # Get session string
         # 获取会话字符串
