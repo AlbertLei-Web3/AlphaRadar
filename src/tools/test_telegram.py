@@ -2,11 +2,11 @@
 # -*- coding: utf-8 -*-
 
 """
-Test Telegram Group Interaction
-测试 Telegram 群组交互
+Test Telegram Channel Interaction
+测试 Telegram 频道交互
 
-This script tests the connection to Telegram groups and message retrieval.
-这个脚本测试与 Telegram 群组的连接和消息获取。
+This script tests the connection to Telegram channels and message retrieval.
+这个脚本测试与 Telegram 频道的连接和消息获取。
 
 Dependencies 依赖:
 - python-dotenv
@@ -26,110 +26,49 @@ from pyrogram.types import Message, Chat
 # 加载环境变量
 load_dotenv()
 
-# GMGN Signal Groups
-# GMGN 信号群组
-GMGN_GROUPS = {
-    "GMGN Featured Signals(Lv2) - SOL": "gmgnsignals",
-    "GMGN Featured Signals(Lv2) - ETH": "gmgnsignalseth",
-    "GMGN Featured Signals(Lv2) - BTC": "gmgnsignalsbtc",
-    "GMGN Featured Signals(Lv2) - BNB": "gmgnsignalsbnb",
-    "GMGN Featured Signals(Lv2) - AVAX": "gmgnsignalsavax",
-    "GMGN Featured Signals(Lv2) - MATIC": "gmgnsignalsmatic",
-    "GMGN Featured Signals(Lv2) - ARB": "gmgnsignalsarb",
-    "GMGN Featured Signals(Lv2) - OP": "gmgnsignalsop",
-    "GMGN Featured Signals(Lv2) - BASE": "gmgnsignalsbase",
-    "GMGN Featured Signals(Lv2) - INJ": "gmgnsignalsinj",
-    "GMGN Featured Signals(Lv2) - TIA": "gmgnsignalstia",
-    "GMGN Featured Signals(Lv2) - SEI": "gmgnsignalssei",
-    "GMGN Featured Signals(Lv2) - SUI": "gmgnsignalssui",
-    "GMGN Featured Signals(Lv2) - APT": "gmgnsignalsapt",
-    "GMGN Featured Signals(Lv2) - NEAR": "gmgnsignalsnear",
-    "GMGN Featured Signals(Lv2) - ATOM": "gmgnsignalsatom",
-    "GMGN Featured Signals(Lv2) - OSMO": "gmgnsignalsosmo"
-}
+# 主群组ID和要监听的thread_id
+GROUP_ID = -1002202241417  # GMGN Featured Signals(Lv2) - SOL
+THREAD_IDS = [3216629, 3216593]  # Pump King of the hill (KOTH) 和 KOL FOMO
 
-async def test_telegram():
+async def main():
     """
-    Test Telegram connection and group interaction
-    测试 Telegram 连接和群组交互
+    监听GMGN主群组下两个thread的所有消息
+    Listen to all messages from two threads in the GMGN main group
     """
-    app = None
-    try:
-        print("🚀 Starting Telegram test...")
-
-        # Get proxy configuration from environment variables
-        # 从环境变量获取代理配置
-        proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
-        proxy_port = int(os.getenv("PROXY_PORT", "10808"))
-        proxy_protocol = os.getenv("PROXY_PROTOCOL", "socks5")
-
-        # Initialize client with proxy
-        # 使用代理初始化客户端
-        app = Client(
-            "my_account",
-            api_id=os.getenv("TELEGRAM_API_ID"),
-            api_hash=os.getenv("TELEGRAM_API_HASH"),
-            session_string=os.getenv("TELEGRAM_SESSION_STRING"),
-            proxy=dict(
-                scheme=proxy_protocol,
-                hostname=proxy_host,
-                port=proxy_port
-            )
+    app = Client(
+        "my_account",
+        api_id=os.getenv("TELEGRAM_API_ID"),
+        api_hash=os.getenv("TELEGRAM_API_HASH"),
+        session_string=os.getenv("TELEGRAM_SESSION_STRING"),
+        proxy=dict(
+            scheme=os.getenv("PROXY_PROTOCOL", "socks5"),
+            hostname=os.getenv("PROXY_HOST", "127.0.0.1"),
+            port=int(os.getenv("PROXY_PORT", "10808"))
         )
+    )
 
-        # Connect to Telegram
-        # 连接到 Telegram
-        print("🔌 Connecting to Telegram...")
-        await app.start()
+    await app.start()
+    print("✅ 监听已启动，等待消息... (Ctrl+C 停止)")
 
-        # Get user information
-        # 获取用户信息
-        me = await app.get_me()
-        print(f"\n✅ Connected as: {me.first_name} (@{me.username})")
-
-        # Get list of dialogs (chats and groups)
-        # 获取对话列表（聊天和群组）
-        print("\n📋 Available GMGN signal groups:")
-        group_ids = {}
-        
-        async for dialog in app.get_dialogs():
-            chat = dialog.chat
-            if chat.username in GMGN_GROUPS.values():
-                group_ids[chat.title] = chat.id
-                print(f"- {chat.title} (ID: {chat.id})")
-
-        if not group_ids:
-            print("❌ No GMGN signal groups found. Please make sure you're a member of these groups.")
-            return
-
-        # Set up message handlers for all groups
-        # 为所有群组设置消息处理器
-        @app.on_message(filters.chat(list(group_ids.values())))
-        async def handle_new_message(client, message: Message):
-            chat = await app.get_chat(message.chat.id)
-            print(f"\n📨 New message in {chat.title}")
-            print(f"From: {message.from_user.first_name if message.from_user else 'Unknown'}")
+    # 监听指定thread_id的消息
+    @app.on_message(filters.chat(GROUP_ID))
+    async def handler(client, message: Message):
+        # 检查是否属于我们关注的thread
+        if message.thread_id in THREAD_IDS:
+            print(f"\n--- 捕获到新消息 ---")
+            print(f"Thread ID: {message.thread_id}")
+            print(f"Message ID: {message.id}")
             print(f"Time: {message.date}")
             print(f"Content: {message.text}")
-            print("---")
+            print("-------------------")
 
-        print("\n👂 Listening for new messages in all GMGN signal groups... (Press Ctrl+C to stop)")
-        
-        # Keep the script running using asyncio
-        # 使用 asyncio 保持脚本运行
+    try:
         while True:
             await asyncio.sleep(1)
-
     except KeyboardInterrupt:
-        print("\n👋 Stopping the script...")
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        sys.exit(1)
+        print("\n👋 监听已停止")
     finally:
-        # Disconnect
-        # 断开连接
-        if app:
-            await app.stop()
+        await app.stop()
 
 if __name__ == "__main__":
-    asyncio.run(test_telegram()) 
+    asyncio.run(main()) 
