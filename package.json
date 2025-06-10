@@ -1,10 +1,10 @@
 {
   "name": "alpha-radar",
   "version": "0.1.0",
-  "description": "MEME Coin Early Detection System",
+  "description": "Alpha Radar - Web3 Signal Monitoring System",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node src/index.ts",
+    "dev": "ts-node --transpile-only",
     "build": "tsc",
     "start": "node dist/index.js",
     "test:gmgn": "ts-node src/test/gmgn-api.test.ts",
@@ -20,6 +20,7 @@
     "node-fetch": "^2.6.7",
     "socks-proxy-agent": "^8.0.5",
     "telegraf": "^4.16.3",
+    "telegram": "^2.26.22",
     "telegram-mtproto": "^1.0.5"
   },
   "devDependencies": {
