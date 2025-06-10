@@ -106,6 +106,36 @@ export class TelegramMTProtoClient extends EventEmitter {
     }
 
     /**
+     * Resolve channel ID from username or URL
+     * 从用户名或 URL 解析频道 ID
+     */
+    private async resolveChannelId(channelIdentifier: string): Promise<string | null> {
+        try {
+            // Remove @ symbol if present
+            // 如果存在 @ 符号则移除
+            const cleanIdentifier = channelIdentifier.replace('@', '');
+            
+            // Try to resolve the channel
+            // 尝试解析频道
+            const result = await this.client.call('contacts.resolveUsername', {
+                username: cleanIdentifier
+            });
+
+            if (result && result.chats && result.chats.length > 0) {
+                const chat = result.chats[0];
+                logger.info(`Resolved channel ID for ${cleanIdentifier}: ${chat.id}`);
+                return chat.id.toString();
+            }
+
+            logger.warn(`Could not resolve channel ID for ${cleanIdentifier}`);
+            return null;
+        } catch (error) {
+            logger.error(`Error resolving channel ID for ${channelIdentifier}:`, error);
+            return null;
+        }
+    }
+
+    /**
      * Start monitoring target groups
      * 开始监控目标群组
      */
@@ -115,8 +145,16 @@ export class TelegramMTProtoClient extends EventEmitter {
             return;
         }
 
-        for (const groupId of this.config.targetGroups) {
+        for (const groupIdentifier of this.config.targetGroups) {
             try {
+                // Resolve channel ID
+                // 解析频道 ID
+                const groupId = await this.resolveChannelId(groupIdentifier);
+                if (!groupId) {
+                    logger.error(`Failed to resolve ID for group ${groupIdentifier}`);
+                    continue;
+                }
+
                 // Get group information
                 // 获取群组信息
                 const groupInfo = await this.client.call('channels.getFullChannel', {
@@ -129,7 +167,7 @@ export class TelegramMTProtoClient extends EventEmitter {
                 // 开始消息监控
                 this.monitorGroupMessages(groupId);
             } catch (error) {
-                logger.error(`Failed to monitor group ${groupId}:`, error);
+                logger.error(`Failed to monitor group ${groupIdentifier}:`, error);
             }
         }
     }
