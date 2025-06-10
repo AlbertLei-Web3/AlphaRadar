@@ -26,15 +26,16 @@ async function generateSession() {
             });
         });
 
-        // Initialize client
-        // 初始化客户端
+        // Initialize client with minimal settings
+        // 使用最小设置初始化客户端
         const client = new TelegramClient(
             new StringSession(''), // Empty session
             27321288, // Your API ID
             '5c3202e68b0b9d356e7fc7daaec65e90', // Your API Hash
             {
                 connectionRetries: 5,
-                useWSS: true
+                useWSS: false, // Use TCP instead of WebSocket
+                timeout: 30000 // Increase timeout to 30 seconds
             }
         );
 
