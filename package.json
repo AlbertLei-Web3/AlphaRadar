@@ -19,7 +19,8 @@
     "https-proxy-agent": "^7.0.6",
     "node-fetch": "^2.6.7",
     "socks-proxy-agent": "^8.0.5",
-    "telegraf": "^4.16.3"
+    "telegraf": "^4.16.3",
+    "telegram-mtproto": "^1.0.5"
   },
   "devDependencies": {
     "@babel/plugin-transform-runtime": "^7.27.4",
