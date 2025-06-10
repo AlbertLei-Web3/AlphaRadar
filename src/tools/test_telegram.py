@@ -1,39 +1,21 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-"""
-Test Telegram Channel Interaction
-测试 Telegram 频道交互
-
-This script tests the connection to Telegram channels and message retrieval.
-这个脚本测试与 Telegram 频道的连接和消息获取。
-
-Dependencies 依赖:
-- python-dotenv
-- pyrogram
-- tgcrypto
-"""
-
 import os
 import sys
 import asyncio
-from datetime import datetime
 from dotenv import load_dotenv
-from pyrogram import Client, filters
-from pyrogram.types import Message, Chat
+from pyrogram import Client
+from pyrogram.raw import types
 
-# Load environment variables
 # 加载环境变量
 load_dotenv()
 
-# 主群组ID和要监听的thread_id
 GROUP_ID = -1002202241417  # GMGN Featured Signals(Lv2) - SOL
 THREAD_IDS = [3216629, 3216593]  # Pump King of the hill (KOTH) 和 KOL FOMO
 
+
 async def main():
     """
-    监听GMGN主群组下两个thread的所有消息
-    Listen to all messages from two threads in the GMGN main group
+    使用 on_raw_update 打印所有原始 update，便于调试 thread/topic 消息
+    Use on_raw_update to print all raw updates for debugging thread/topic messages
     """
     app = Client(
         "my_account",
@@ -48,19 +30,27 @@ async def main():
     )
 
     await app.start()
-    print("✅ 监听已启动，等待消息... (Ctrl+C 停止)")
+    print("✅ on_raw_update 调试已启动，等待原始消息... (Ctrl+C 停止)")
 
-    # 监听指定thread_id的消息
-    @app.on_message(filters.chat(GROUP_ID))
-    async def handler(client, message: Message):
-        # 检查是否属于我们关注的thread
-        if message.thread_id in THREAD_IDS:
-            print(f"\n--- 捕获到新消息 ---")
-            print(f"Thread ID: {message.thread_id}")
-            print(f"Message ID: {message.id}")
-            print(f"Time: {message.date}")
-            print(f"Content: {message.text}")
-            print("-------------------")
+    @app.on_raw_update()
+    async def raw_update_handler(client, update, users, chats):
+        # 只打印与目标群组相关的 update
+        # Only print updates related to the target group
+        try:
+            # 打印所有 update 的类型和内容
+            print("\n--- 捕获到原始 update ---")
+            print(f"Update type: {type(update)}")
+            print(f"Update content: {update}")
+            # 如果 update 里有 peer/channel/group id，打印出来
+            if hasattr(update, 'peer'):
+                print(f"peer: {update.peer}")
+            if hasattr(update, 'channel_id'):
+                print(f"channel_id: {update.channel_id}")
+            if hasattr(update, 'message'):
+                print(f"message: {getattr(update, 'message', None)}")
+            print("------------------------")
+        except Exception as e:
+            print(f"❌ Error in raw_update_handler: {e}")
 
     try:
         while True:
@@ -71,4 +61,4 @@ async def main():
         await app.stop()
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
